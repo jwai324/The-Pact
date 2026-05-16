@@ -2,11 +2,17 @@ import { createClient } from "@supabase/supabase-js";
 
 // Built-in defaults so the app shows live data even when no env vars /
 // GitHub Actions secrets are configured. This is safe by design: the app
-// has no auth and the publishable key is meant to ship in the client
-// bundle (see .env.example). Env vars still take precedence so a different
-// project can be pointed at without code changes.
+// has no auth and the anon key is meant to ship in the client bundle (see
+// .env.example). Env vars still take precedence so a different project can
+// be pointed at without code changes.
+//
+// Use the legacy anon JWT (not the sb_publishable_ key): supabase-js sends
+// the key as a Bearer token and PostgREST resolves the `anon` role from
+// the JWT directly, whereas the publishable key isn't decoded that way and
+// every query comes back empty.
 const DEFAULT_SUPABASE_URL = "https://xvjsnfbvywavzdrjdfvi.supabase.co";
-const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_FxpzEQdH-DNy6xti0DffdQ_PTYcnKdJ";
+const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh2anNuZmJ2eXdhdnpkcmpkZnZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMTU4MTAsImV4cCI6MjA5MzY5MTgxMH0.5faWdKjhxXeDFgODPnOYbzhueZmehQADM0TktteSKUM";
 
 // Trimmed so a secret pasted with a trailing newline/space (a very common
 // mistake for GitHub Actions secrets) doesn't slip through as "present but
