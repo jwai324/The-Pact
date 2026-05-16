@@ -93,4 +93,5 @@ export type Action =
   | { type: "ADD_TASK"; goalId: string; title: string; minutes: number | null }
   | { type: "TOGGLE_TASK"; id: string }
   | { type: "DELETE_TASK"; id: string }
+  | { type: "DELETE_GOAL"; id: string }
   | { type: "LOG_PAYMENT"; amount: number; note: string; proofUrl: string };
