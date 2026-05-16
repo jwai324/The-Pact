@@ -95,5 +95,6 @@ export type Action =
   | { type: "DELETE_TASK"; id: string }
   | { type: "DELETE_GOAL"; id: string }
   | { type: "DELETE_WANT"; id: string }
+  | { type: "DELETE_SPEND"; id: string }
   | { type: "RESET_URGES" }
   | { type: "LOG_PAYMENT"; amount: number; note: string; proofUrl: string };
