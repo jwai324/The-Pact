@@ -1,4 +1,4 @@
-import type { Category } from "../state/types";
+import type { Category, DataSlice } from "../state/types";
 
 // ── Time helpers (ported verbatim from components.jsx) ──────────────────────
 export const formatRelative = (date: Date, now: Date = new Date()): string => {
@@ -53,6 +53,63 @@ export const currentWeek = () => {
       month: "short",
       day: "numeric",
     }),
+  };
+};
+
+// ── Period rollover ─────────────────────────────────────────────────────────
+// The app is client-only (no cron), so overdue quests are reconciled the next
+// time it's opened. We persist the last period each category was reconciled
+// for and compare it to the current period on load. Keys are designed so a
+// plain string `<` is a correct chronological compare, including year wrap.
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+export const currentMonthKey = (now: Date = new Date()): string =>
+  `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+
+export const currentQuarterKey = (now: Date = new Date()): string =>
+  `${now.getFullYear()}-Q${Math.floor(now.getMonth() / 3) + 1}`;
+
+export interface PeriodKeys {
+  weekKey: string;
+  monthKey: string;
+  quarterKey: string;
+}
+
+export const currentKeys = (): PeriodKeys => ({
+  weekKey: currentWeek().weekKey,
+  monthKey: currentMonthKey(),
+  quarterKey: currentQuarterKey(),
+});
+
+export interface Rollover {
+  weekly: boolean;
+  monthly: boolean;
+  quarterly: boolean;
+  newKeys: PeriodKeys;
+  changed: boolean;
+}
+
+// A null stored key means "never reconciled" — initialize it to the current
+// period but fail nothing, so a fresh/seeded DB is never retro-failed.
+const evalPeriod = (stored: string | null, current: string) => {
+  const rolled = stored != null && stored < current;
+  const newKey = stored == null || rolled ? current : stored;
+  return { rolled, newKey, changed: newKey !== stored };
+};
+
+export const detectRollover = (
+  data: Pick<DataSlice, "lastWeekKey" | "lastMonthKey" | "lastQuarterKey">,
+  keys: PeriodKeys
+): Rollover => {
+  const w = evalPeriod(data.lastWeekKey, keys.weekKey);
+  const m = evalPeriod(data.lastMonthKey, keys.monthKey);
+  const q = evalPeriod(data.lastQuarterKey, keys.quarterKey);
+  return {
+    weekly: w.rolled,
+    monthly: m.rolled,
+    quarterly: q.rolled,
+    newKeys: { weekKey: w.newKey, monthKey: m.newKey, quarterKey: q.newKey },
+    changed: w.changed || m.changed || q.changed,
   };
 };
 
