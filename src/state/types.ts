@@ -77,6 +77,7 @@ export interface State extends DataSlice {
 
 export type Action =
   | { type: "HYDRATE"; data: DataSlice }
+  | { type: "LOAD_FAILED" }
   | { type: "TAB"; tab: string }
   | { type: "OPEN_SHEET"; sheet: string; data?: State["sheetData"] }
   | { type: "CLOSE_SHEET" }

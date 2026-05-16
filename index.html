@@ -132,6 +132,34 @@
 
 <div id="root"></div>
 
+<noscript>
+  <div style="max-width:420px;margin:15vh auto;padding:28px 24px;background:#FFFFFF;color:#1B1140;border:2px solid #1B1140;border-radius:16px;box-shadow:6px 6px 0 #1B1140;font-family:'Geist',system-ui,sans-serif">
+    <h1 style="font:700 22px/1.2 'Fraunces',serif;margin:0 0 10px">JavaScript required</h1>
+    <p style="margin:0;color:#4F3F87">The Pact needs JavaScript enabled to run. Turn it on and reload this page.</p>
+  </div>
+</noscript>
+
+<script>
+  // Blank-screen watchdog. If the app bundle 404s, fails to parse, or throws
+  // before React paints, #root stays empty and the page looks blank/white.
+  // After a grace period, if nothing has mounted, show a readable message
+  // instead of a blank page. main.tsx cancels this once React renders.
+  (function () {
+    var timer = setTimeout(function () {
+      var root = document.getElementById("root");
+      if (!root || root.childElementCount > 0) return;
+      root.innerHTML =
+        '<div style="max-width:420px;margin:15vh auto;padding:28px 24px;background:#FFFFFF;color:#1B1140;border:2px solid #1B1140;border-radius:16px;box-shadow:6px 6px 0 #1B1140;font-family:\'Geist\',system-ui,sans-serif">' +
+          '<h1 style="font:700 22px/1.2 \'Fraunces\',serif;margin:0 0 10px">Couldn’t load the app</h1>' +
+          '<p style="margin:0 0 14px;color:#4F3F87">It didn’t start — usually a temporary network hiccup or a stale cached version.</p>' +
+          '<button onclick="location.reload()" style="appearance:none;border:2px solid #1B1140;background:#FF5A3C;color:#fff;font:700 14px \'Geist\',system-ui,sans-serif;padding:12px 18px;border-radius:12px;box-shadow:3px 3px 0 #1B1140;cursor:pointer">Reload</button>' +
+          '<p style="margin:14px 0 0;font-size:13px;color:#8E83B5">If it keeps happening, a new deploy may still be in progress — wait a minute and reload.</p>' +
+        '</div>';
+    }, 8000);
+    window.__pactCancelBoot = function () { clearTimeout(timer); };
+  })();
+</script>
+
 <script type="module" src="/src/main.tsx"></script>
 
 </body>

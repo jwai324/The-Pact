@@ -17,6 +17,7 @@ export function usePactStore() {
       rawDispatch({ type: "HYDRATE", data });
     } catch (err) {
       console.error("[store] refetch failed", err);
+      rawDispatch({ type: "LOAD_FAILED" });
     }
   }, []);
 
