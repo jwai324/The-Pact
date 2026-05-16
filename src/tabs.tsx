@@ -1392,6 +1392,7 @@ const WantRow = ({
 // ─────────────────────────────────────────────────────────────
 export const SpendTab = ({
   state,
+  dispatch,
   openSheet,
 }: {
   state: State;
@@ -1591,7 +1592,34 @@ export const SpendTab = ({
                   </span>
                 </div>
               </div>
-              <Money amount={tx.amount} size={18} weight={700} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Money amount={tx.amount} size={18} weight={700} />
+                <button
+                  onClick={() =>
+                    dispatch({ type: "DELETE_SPEND", id: tx.id })
+                  }
+                  aria-label={`Delete purchase: ${
+                    tx.note || tx.category || "Purchase"
+                  }`}
+                  style={{
+                    flexShrink: 0,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 7,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--ink-soft)",
+                    opacity: 0.5,
+                    padding: 0,
+                  }}
+                >
+                  <Icon name="x" size={13} strokeWidth={2.4} />
+                </button>
+              </div>
             </div>
           ))}
         </Card>

@@ -204,6 +204,9 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
       case "DELETE_WANT":
         await supabase.from("wants").delete().eq("id", action.id);
         return true;
+      case "DELETE_SPEND":
+        await supabase.from("spending").delete().eq("id", action.id);
+        return true;
       case "RESET_URGES": {
         // Erase decided history; pending wants (decision IS NULL) stay.
         await supabase.from("wants").delete().not("decision", "is", null);

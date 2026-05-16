@@ -121,6 +121,11 @@ export function reducer(state: State, action: Action): State {
         ...state,
         wants: state.wants.filter((w) => w.id !== action.id),
       };
+    case "DELETE_SPEND":
+      return {
+        ...state,
+        spending: state.spending.filter((s) => s.id !== action.id),
+      };
     case "RESET_URGES":
       // Erase decided history and zero the lifetime skip counter so the
       // "Urges skipped" total (urgesSkipped + decided skips) reads 0.
