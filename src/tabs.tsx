@@ -1024,11 +1024,35 @@ export const WantsTab = ({
         >
           <Icon name="sparkle" size={16} />
         </div>
-        <div
-          style={{ position: "absolute", top: 30, right: 24, opacity: 0.5 }}
+        <button
+          onClick={() => {
+            if (
+              window.confirm(
+                "Reset urges skipped to 0 and erase want history? This can't be undone."
+              )
+            )
+              dispatch({ type: "RESET_URGES" });
+          }}
+          aria-label="Reset urges skipped and erase history"
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 2,
+            background: "rgba(255,255,255,0.18)",
+            border: "1.5px solid rgba(255,255,255,0.55)",
+            color: "white",
+            borderRadius: 999,
+            padding: "5px 12px",
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            cursor: "pointer",
+          }}
         >
-          <Icon name="sparkle" size={12} />
-        </div>
+          RESET
+        </button>
         <div
           style={{ position: "absolute", bottom: 18, right: 18, opacity: 0.4 }}
         >
@@ -1187,9 +1211,36 @@ export const WantsTab = ({
                     {w.dateLabel}
                   </div>
                 </div>
-                <Pill tone={w.decision === "skip" ? "pass" : "neutral"}>
-                  {w.decision === "skip" ? "SKIPPED ✓" : "BOUGHT"}
-                </Pill>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 10 }}
+                >
+                  <Pill tone={w.decision === "skip" ? "pass" : "neutral"}>
+                    {w.decision === "skip" ? "SKIPPED ✓" : "BOUGHT"}
+                  </Pill>
+                  <button
+                    onClick={() =>
+                      dispatch({ type: "DELETE_WANT", id: w.id })
+                    }
+                    aria-label={`Delete ${w.title}`}
+                    style={{
+                      flexShrink: 0,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 7,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--ink-soft)",
+                      opacity: 0.5,
+                      padding: 0,
+                    }}
+                  >
+                    <Icon name="x" size={13} strokeWidth={2.4} />
+                  </button>
+                </div>
               </div>
             ))}
           </Card>
@@ -1232,14 +1283,37 @@ const WantRow = ({
         <div style={{ fontSize: 15, color: "var(--ink)", fontWeight: 600 }}>
           {want.title}
         </div>
-        {want.price != null && (
-          <Money
-            amount={want.price}
-            size={14}
-            weight={600}
-            color="var(--ink-soft)"
-          />
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {want.price != null && (
+            <Money
+              amount={want.price}
+              size={14}
+              weight={600}
+              color="var(--ink-soft)"
+            />
+          )}
+          <button
+            onClick={() => dispatch({ type: "DELETE_WANT", id: want.id })}
+            aria-label={`Delete ${want.title}`}
+            style={{
+              flexShrink: 0,
+              width: 24,
+              height: 24,
+              borderRadius: 7,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--ink-soft)",
+              opacity: 0.5,
+              padding: 0,
+            }}
+          >
+            <Icon name="x" size={13} strokeWidth={2.4} />
+          </button>
+        </div>
       </div>
       <div style={{ marginBottom: 10 }}>
         <ProgressBar

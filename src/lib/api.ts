@@ -201,6 +201,18 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         }
         return true;
       }
+      case "DELETE_WANT":
+        await supabase.from("wants").delete().eq("id", action.id);
+        return true;
+      case "RESET_URGES": {
+        // Erase decided history; pending wants (decision IS NULL) stay.
+        await supabase.from("wants").delete().not("decision", "is", null);
+        await supabase
+          .from("app_state")
+          .update({ urges_skipped: 0 })
+          .eq("id", 1);
+        return true;
+      }
       case "ADD_GOAL": {
         const nextSort = Math.max(0, ...prev.goals.map((g) => g.sort)) + 1;
         await supabase.from("goals").insert({

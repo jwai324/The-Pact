@@ -116,6 +116,19 @@ export function reducer(state: State, action: Action): State {
             : state.confettiKey,
       };
     }
+    case "DELETE_WANT":
+      return {
+        ...state,
+        wants: state.wants.filter((w) => w.id !== action.id),
+      };
+    case "RESET_URGES":
+      // Erase decided history and zero the lifetime skip counter so the
+      // "Urges skipped" total (urgesSkipped + decided skips) reads 0.
+      return {
+        ...state,
+        wants: state.wants.filter((w) => !w.decision),
+        urgesSkipped: 0,
+      };
     case "ADD_GOAL": {
       const g = {
         id: "g" + Date.now(),
