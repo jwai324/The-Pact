@@ -7,3 +7,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface Window {
+  // Cancels index.html's blank-screen watchdog once React has mounted.
+  __pactCancelBoot?: () => void;
+}
