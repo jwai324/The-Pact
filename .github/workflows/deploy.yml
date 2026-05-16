@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/implement-index-html-MVGfD]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +28,14 @@ jobs:
 
       - run: npm ci
 
+      # Enables GitHub Pages and sets its source to GitHub Actions when the
+      # repo has never had Pages configured. Without this the first
+      # deploy-pages run fails and the site serves a 404.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       # Project pages are served at https://<user>.github.io/<repo>/, so the
       # Vite base must be /<repo>/. Derived from GITHUB_REPOSITORY (exact case).
       - name: Compute base path
@@ -38,6 +46,10 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build
+
+      # Serve the app for unknown paths (deep links / reloads) instead of a 404.
+      - name: Add SPA 404 fallback
+        run: cp dist/index.html dist/404.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
