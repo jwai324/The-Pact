@@ -11,6 +11,9 @@ export interface Goal {
   relative: string;
   paid: boolean;
   sort: number;
+  // Parked quest: lives only on the hidden Future Quests page, never shown
+  // in active lists and never auto-failed, until pushed into a real spot.
+  future: boolean;
 }
 
 export interface Task {
@@ -58,6 +61,7 @@ export interface DataSlice {
   lastLockedStakes: number;
   badges: string[];
   goals: Goal[];
+  futureGoals: Goal[];
   tasks: Task[];
   wants: Want[];
   spending: Spend[];
@@ -94,6 +98,9 @@ export type Action =
   | { type: "ADD_WANT"; title: string; price: number | null; hours: number }
   | { type: "DECIDE_WANT"; id: string; decision: "skip" | "buy" }
   | { type: "ADD_GOAL"; title: string; category: Category; stake: number }
+  | { type: "ADD_FUTURE_GOAL"; title: string; stake: number }
+  | { type: "PUSH_FUTURE_GOAL"; id: string; category: Category }
+  | { type: "DELETE_FUTURE_GOAL"; id: string }
   | { type: "LOG_SPEND"; amount: number; note: string; category: string }
   | { type: "ADD_TASK"; goalId: string; title: string; minutes: number | null }
   | { type: "TOGGLE_TASK"; id: string }

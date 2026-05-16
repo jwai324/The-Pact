@@ -55,19 +55,28 @@ export async function fetchAll(): Promise<DataSlice> {
 
   const a = appStateRes.data;
 
-  const goals: Goal[] = (goalsRes.data || []).map((g) => ({
-    id: g.id,
-    title: g.title,
-    category: g.category as Category,
-    stake: Number(g.stake),
-    status: g.status as GoalStatus,
-    relative:
-      g.status === "Pending"
+  const allGoals: Goal[] = (goalsRes.data || []).map((g) => {
+    const future = !!g.future;
+    return {
+      id: g.id,
+      title: g.title,
+      category: g.category as Category,
+      stake: Number(g.stake),
+      status: g.status as GoalStatus,
+      // Parked quests have no live deadline; only active Pending quests get
+      // a computed countdown.
+      relative: future
+        ? ""
+        : g.status === "Pending"
         ? computeRelative(g.category as Category)
         : g.relative || "",
-    paid: !!g.paid,
-    sort: g.sort,
-  }));
+      paid: !!g.paid,
+      sort: g.sort,
+      future,
+    };
+  });
+  const goals = allGoals.filter((g) => !g.future);
+  const futureGoals = allGoals.filter((g) => g.future);
 
   const tasks: Task[] = (tasksRes.data || []).map((t) => ({
     id: t.id,
@@ -114,6 +123,7 @@ export async function fetchAll(): Promise<DataSlice> {
     lastLockedStakes: a ? Number(a.last_locked_stakes) : 0,
     badges: (a?.badges as string[]) ?? [],
     goals,
+    futureGoals,
     tasks,
     wants,
     spending,
@@ -153,7 +163,8 @@ export async function persistSweep(rollover: Rollover): Promise<boolean> {
         .from("goals")
         .update({ status: "Fail" })
         .eq("category", cat)
-        .eq("status", "Pending");
+        .eq("status", "Pending")
+        .eq("future", false);
     }
     return true;
   } catch (err) {
@@ -226,7 +237,8 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         await supabase
           .from("goals")
           .update({ status: "Pending", relative: null })
-          .eq("category", "Weekly");
+          .eq("category", "Weekly")
+          .eq("future", false);
         return true;
       }
       case "ADD_WANT": {
@@ -285,6 +297,38 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         });
         return true;
       }
+      case "ADD_FUTURE_GOAL": {
+        const nextSort =
+          Math.max(0, ...prev.futureGoals.map((g) => g.sort)) + 1;
+        await supabase.from("goals").insert({
+          title: action.title,
+          category: "Side",
+          stake: action.stake,
+          status: "Pending",
+          relative: null,
+          paid: false,
+          sort: nextSort,
+          future: true,
+        });
+        return true;
+      }
+      case "PUSH_FUTURE_GOAL": {
+        const nextSort = Math.max(0, ...prev.goals.map((g) => g.sort)) + 1;
+        await supabase
+          .from("goals")
+          .update({
+            category: action.category,
+            status: "Pending",
+            relative: null,
+            future: false,
+            sort: nextSort,
+          })
+          .eq("id", action.id);
+        return true;
+      }
+      case "DELETE_FUTURE_GOAL":
+        await supabase.from("goals").delete().eq("id", action.id);
+        return true;
       case "LOG_SPEND":
         await supabase.from("spending").insert({
           amount: action.amount,
