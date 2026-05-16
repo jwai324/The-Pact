@@ -1,4 +1,4 @@
-import type { State, Action } from "./types";
+import type { State, Action, Goal } from "./types";
 import { computeRelative, currentWeek } from "../lib/helpers";
 
 export const emptyState = (): State => {
@@ -14,6 +14,7 @@ export const emptyState = (): State => {
     lastLockedStakes: 0,
     badges: [],
     goals: [],
+    futureGoals: [],
     tasks: [],
     wants: [],
     spending: [],
@@ -163,9 +164,48 @@ export function reducer(state: State, action: Action): State {
         paid: false,
         sort:
           Math.max(0, ...state.goals.map((x) => x.sort)) + 1,
+        future: false,
       };
       return { ...state, goals: [...state.goals, g] };
     }
+    case "ADD_FUTURE_GOAL": {
+      // Parked: no real spot yet (placeholder category, chosen on push),
+      // and excluded from auto-fail until then.
+      const g = {
+        id: "g" + Date.now(),
+        title: action.title,
+        category: "Side" as const,
+        stake: action.stake,
+        status: "Pending" as const,
+        relative: "",
+        paid: false,
+        sort: Math.max(0, ...state.futureGoals.map((x) => x.sort)) + 1,
+        future: true,
+      };
+      return { ...state, futureGoals: [...state.futureGoals, g] };
+    }
+    case "PUSH_FUTURE_GOAL": {
+      const g = state.futureGoals.find((x) => x.id === action.id);
+      if (!g) return state;
+      const promoted: Goal = {
+        ...g,
+        category: action.category,
+        status: "Pending",
+        relative: computeRelative(action.category),
+        future: false,
+        sort: Math.max(0, ...state.goals.map((x) => x.sort)) + 1,
+      };
+      return {
+        ...state,
+        futureGoals: state.futureGoals.filter((x) => x.id !== action.id),
+        goals: [...state.goals, promoted],
+      };
+    }
+    case "DELETE_FUTURE_GOAL":
+      return {
+        ...state,
+        futureGoals: state.futureGoals.filter((g) => g.id !== action.id),
+      };
     case "LOG_SPEND": {
       const s = {
         id: "s" + Date.now(),

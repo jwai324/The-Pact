@@ -1,6 +1,6 @@
 // Main App for The Pact — gamified (ported from app.jsx; Tweaks design-harness
 // removed, in-memory seed replaced with Supabase-backed store).
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePactStore } from "./state/store";
 import type { Category, State } from "./state/types";
 import { Icon, Eyebrow, Display, Confetti } from "./components/ui";
@@ -11,11 +11,13 @@ import {
   WantsTab,
   SpendTab,
   PactTab,
+  FutureQuestsTab,
 } from "./tabs";
 import {
   AddWantSheet,
   AddGoalSheet,
   AddTaskSheet,
+  AddFutureGoalSheet,
   LogSpendSheet,
   EditBudgetSheet,
   LogPaymentSheet,
@@ -25,6 +27,24 @@ import {
 export default function App() {
   const [state, dispatch] = usePactStore();
   const [now, setNow] = useState(Date.now());
+
+  // Easter egg: 5 taps on the home greeting opens the hidden Future Quests
+  // page. Taps must be in quick succession (the counter resets after a pause).
+  const tapCount = useRef(0);
+  const tapTimer = useRef<number | undefined>(undefined);
+  const onTitleTap = () => {
+    if (state.tab !== "today") return;
+    window.clearTimeout(tapTimer.current);
+    tapCount.current += 1;
+    if (tapCount.current >= 5) {
+      tapCount.current = 0;
+      dispatch({ type: "TAB", tab: "future" });
+      return;
+    }
+    tapTimer.current = window.setTimeout(() => {
+      tapCount.current = 0;
+    }, 1500);
+  };
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000);
@@ -66,6 +86,13 @@ export default function App() {
       <SpendTab state={state} dispatch={dispatch} openSheet={openSheet} />
     ),
     pact: <PactTab state={state} dispatch={dispatch} openSheet={openSheet} />,
+    future: (
+      <FutureQuestsTab
+        state={state}
+        dispatch={dispatch}
+        openSheet={openSheet}
+      />
+    ),
   };
 
   // Live date for the header eyebrows (re-derived from `now`, which ticks
@@ -92,6 +119,7 @@ export default function App() {
     wants: { eyebrow: "THE FRICTION LAYER", title: "Want List" },
     spend: { eyebrow: `${dateLabel} · RESETS MON`, title: "Spending" },
     pact: { eyebrow: "WITH JUSTIN WAI", title: "The Pact" },
+    future: { eyebrow: "HIDDEN · THE STASH", title: "Future Quests" },
   };
 
   return (
@@ -125,7 +153,14 @@ export default function App() {
             <Eyebrow style={{ color: "var(--accent)", fontWeight: 700 }}>
               {tabTitle[state.tab].eyebrow}
             </Eyebrow>
-            <div style={{ marginTop: 6 }}>
+            <div
+              style={{
+                marginTop: 6,
+                userSelect: "none",
+                WebkitUserSelect: "none",
+              }}
+              onClick={onTitleTap}
+            >
               <Display size={36} weight={700}>
                 {tabTitle[state.tab].title}
               </Display>
@@ -300,6 +335,11 @@ export default function App() {
         dispatch={dispatch}
         goals={state.goals}
         defaultGoalId={state.sheetData.goalId}
+      />
+      <AddFutureGoalSheet
+        open={state.sheet === "addFutureGoal"}
+        onClose={closeSheet}
+        dispatch={dispatch}
       />
       <LogSpendSheet
         open={state.sheet === "logSpend"}

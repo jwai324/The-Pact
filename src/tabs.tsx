@@ -1024,6 +1024,236 @@ export const GoalsTab = ({
 };
 
 // ─────────────────────────────────────────────────────────────
+// Hidden page (reached by tapping the home greeting 5×). A stash of quests
+// that are parked — never shown in active lists, never auto-failed — until
+// pushed into a real spot.
+export const FutureQuestsTab = ({
+  state,
+  dispatch,
+  openSheet,
+}: {
+  state: State;
+  dispatch: Dispatch;
+  openSheet: OpenSheet;
+}) => {
+  const spots: Goal["category"][] = [
+    "Weekly",
+    "Monthly",
+    "Quarterly",
+    "Side",
+  ];
+  const colorByCat: Record<string, string> = {
+    Weekly: "var(--accent)",
+    Monthly: "var(--purple)",
+    Quarterly: "var(--magenta)",
+    Side: "var(--teal)",
+  };
+  const quests = [...state.futureGoals].sort((a, b) => a.sort - b.sort);
+
+  return (
+    <div
+      style={{
+        padding: "8px 20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
+      <button
+        onClick={() => dispatch({ type: "TAB", tab: "today" })}
+        style={{
+          alignSelf: "flex-start",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          fontWeight: 700,
+          color: "var(--ink-soft)",
+        }}
+      >
+        <span style={{ fontSize: 14 }}>&larr;</span> Back home
+      </button>
+
+      <Card
+        padded={false}
+        color="var(--ink)"
+        style={{ padding: "16px 20px", color: "white" }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            opacity: 0.8,
+          }}
+        >
+          The Stash · {quests.length}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--body)",
+            fontSize: 13,
+            color: "rgba(255,255,255,0.95)",
+            fontWeight: 500,
+            lineHeight: 1.45,
+            marginTop: 8,
+          }}
+        >
+          Park ideas here. They never count against you and never auto-fail —
+          push one into a spot when you're ready to play it.
+        </div>
+      </Card>
+
+      <Card padded={false} style={{ padding: "8px 22px" }}>
+        {quests.map((g, i) => (
+          <div
+            key={g.id}
+            style={{
+              padding: "16px 0",
+              borderTop: i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "var(--display)",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: "var(--ink)",
+                  lineHeight: 1.25,
+                }}
+              >
+                {g.title}
+              </div>
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Delete "${g.title}" from the stash? This can't be undone.`
+                    )
+                  )
+                    dispatch({ type: "DELETE_FUTURE_GOAL", id: g.id });
+                }}
+                aria-label="Delete"
+                style={{
+                  flexShrink: 0,
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 4,
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <Icon name="x" size={14} strokeWidth={2.6} color="var(--red)" />
+              </button>
+            </div>
+            {g.stake > 0 && (
+              <div
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--ink-soft)",
+                  marginTop: 4,
+                }}
+              >
+                ${g.stake} stake
+              </div>
+            )}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: 6,
+                marginTop: 12,
+              }}
+            >
+              {spots.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() =>
+                    dispatch({
+                      type: "PUSH_FUTURE_GOAL",
+                      id: g.id,
+                      category: cat,
+                    })
+                  }
+                  style={{
+                    height: 38,
+                    borderRadius: 9,
+                    cursor: "pointer",
+                    background: colorByCat[cat],
+                    color: "white",
+                    border: "2px solid var(--ink)",
+                    boxShadow: "2px 2px 0 var(--ink)",
+                    fontFamily: "var(--body)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {quests.length === 0 && (
+          <div style={{ padding: "32px 0", textAlign: "center" }}>
+            <div
+              style={{
+                fontFamily: "var(--display)",
+                fontSize: 22,
+                fontWeight: 700,
+                color: "var(--ink)",
+                marginBottom: 6,
+              }}
+            >
+              Nothing stashed yet.
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--body)",
+                fontSize: 14,
+                color: "var(--ink-soft)",
+              }}
+            >
+              Ideas you're not ready to commit to. Safe here.
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Button
+        variant="purple"
+        fullWidth
+        size="lg"
+        onClick={() => openSheet("addFutureGoal")}
+      >
+        <Icon name="plus" size={18} strokeWidth={2.6} color="white" /> Stash a
+        future quest
+      </Button>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
 export const WantsTab = ({
   state,
   dispatch,
