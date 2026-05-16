@@ -1475,6 +1475,8 @@ export const SpendTab = ({
         >
           <Eyebrow>Week of {state.currentWeekLabel}</Eyebrow>
           <button
+            onClick={() => openSheet("editBudget")}
+            aria-label="Edit weekly budget"
             style={{
               background: "white",
               border: "2px solid var(--ink)",

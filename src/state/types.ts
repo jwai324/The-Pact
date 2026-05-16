@@ -99,4 +99,5 @@ export type Action =
   | { type: "DELETE_WANT"; id: string }
   | { type: "DELETE_SPEND"; id: string }
   | { type: "RESET_URGES" }
+  | { type: "SET_BUDGET"; amount: number }
   | { type: "LOG_PAYMENT"; amount: number; note: string; proofUrl: string };

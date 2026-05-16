@@ -147,6 +147,8 @@ export function reducer(state: State, action: Action): State {
         wants: state.wants.filter((w) => !w.decision),
         urgesSkipped: 0,
       };
+    case "SET_BUDGET":
+      return { ...state, weeklyBudget: action.amount };
     case "ADD_GOAL": {
       const g = {
         id: "g" + Date.now(),
