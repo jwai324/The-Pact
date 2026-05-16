@@ -62,6 +62,11 @@ export interface DataSlice {
   wants: Want[];
   spending: Spend[];
   payments: Payment[];
+  // Last period the client reconciled overdue quests for. null until the
+  // first sweep initializes them (so a fresh DB never retro-fails).
+  lastWeekKey: string | null;
+  lastMonthKey: string | null;
+  lastQuarterKey: string | null;
 }
 
 export interface State extends DataSlice {

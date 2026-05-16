@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { emptyState, reducer } from "./reducer";
 import type { Action, State } from "./types";
-import { fetchAll, persist } from "../lib/api";
+import { fetchAll, persist, persistSweep } from "../lib/api";
+import { currentKeys, detectRollover } from "../lib/helpers";
 import { subscribeAll } from "../lib/realtime";
 
 export function usePactStore() {
@@ -13,7 +14,15 @@ export function usePactStore() {
 
   const doRefetch = useCallback(async () => {
     try {
-      const data = await fetchAll();
+      let data = await fetchAll();
+      // Catch up quests whose period ended while the app was closed. Correct
+      // the DB first, then re-read it, so HYDRATE always reflects DB truth —
+      // a failed/partial sweep just self-heals on the next open.
+      const rollover = detectRollover(data, currentKeys());
+      if (rollover.changed) {
+        await persistSweep(rollover);
+        data = await fetchAll();
+      }
       rawDispatch({ type: "HYDRATE", data });
     } catch (err) {
       console.error("[store] refetch failed", err);

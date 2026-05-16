@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import { computeRelative } from "./helpers";
+import { computeRelative, currentWeek } from "./helpers";
+import type { Rollover } from "./helpers";
 import type {
   Action,
   Category,
@@ -117,7 +118,48 @@ export async function fetchAll(): Promise<DataSlice> {
     wants,
     spending,
     payments,
+    // Must stay null when the column is absent/unset — that nullness is what
+    // makes the first sweep initialize instead of retro-failing old quests.
+    lastWeekKey: a?.last_week_key ?? null,
+    lastMonthKey: a?.last_month_key ?? null,
+    lastQuarterKey: a?.last_quarter_key ?? null,
   };
+}
+
+// Reconcile quests whose period ended while the app was closed: any still
+// "Pending" quest in a rolled-over category is failed (same effect as the
+// user pressing Fail), then the period keys are advanced. Called from the
+// store's refetch path BEFORE HYDRATE so the optimistic/persist `prev`
+// staleness can't drop these writes. Keys are written FIRST and the goals
+// update is filtered on status='Pending', so a partial failure or a
+// concurrent device re-running this is idempotent.
+export async function persistSweep(rollover: Rollover): Promise<boolean> {
+  try {
+    await supabase
+      .from("app_state")
+      .update({
+        last_week_key: rollover.newKeys.weekKey,
+        last_month_key: rollover.newKeys.monthKey,
+        last_quarter_key: rollover.newKeys.quarterKey,
+      })
+      .eq("id", 1);
+    const rolled: Category[] = [
+      ...(rollover.weekly ? (["Weekly"] as const) : []),
+      ...(rollover.monthly ? (["Monthly"] as const) : []),
+      ...(rollover.quarterly ? (["Quarterly"] as const) : []),
+    ];
+    for (const cat of rolled) {
+      await supabase
+        .from("goals")
+        .update({ status: "Fail" })
+        .eq("category", cat)
+        .eq("status", "Pending");
+    }
+    return true;
+  } catch (err) {
+    console.error("[persistSweep] write failed", err);
+    return false;
+  }
 }
 
 // Mirror a dispatched action to Supabase. `prev` is state BEFORE the action.
@@ -174,9 +216,12 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         return true;
       }
       case "CLOSE_LOCKIN": {
+        // Lock-in resets all Weekly quests to Pending for the new week. Bump
+        // last_week_key in lockstep so the next load's sweep doesn't see
+        // these fresh Pending quests against a stale key and fail them.
         await supabase
           .from("app_state")
-          .update({ streak: prev.streak + 1 })
+          .update({ streak: prev.streak + 1, last_week_key: currentWeek().weekKey })
           .eq("id", 1);
         await supabase
           .from("goals")
