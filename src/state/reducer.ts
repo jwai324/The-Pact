@@ -151,6 +151,11 @@ export function reducer(state: State, action: Action): State {
         wants: state.wants.filter((w) => !w.decision),
         urgesSkipped: 0,
       };
+    case "AWARD_BADGES":
+      return {
+        ...state,
+        badges: Array.from(new Set([...state.badges, ...action.ids])),
+      };
     case "SET_BUDGET":
       return { ...state, weeklyBudget: action.amount };
     case "ADD_GOAL": {

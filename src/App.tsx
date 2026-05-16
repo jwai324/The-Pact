@@ -4,6 +4,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePactStore } from "./state/store";
 import type { Category, State } from "./state/types";
 import { Icon, Eyebrow, Display, Confetti } from "./components/ui";
+import { TrophyReveal } from "./components/TrophyReveal";
+import {
+  TROPHIES,
+  evaluateTrophies,
+  type Trophy,
+} from "./lib/trophies";
 import {
   TodayTab,
   GoalsTab,
@@ -45,6 +51,38 @@ export default function App() {
       tapCount.current = 0;
     }, 1500);
   };
+
+  // Auto-award trophies as criteria are met, persist them, and queue a
+  // reveal for any unlocked *after* the first load — so a backlog from a
+  // fresh/legacy badge list is backfilled silently, not as 8 animations.
+  const trophySeeded = useRef(false);
+  const [revealQueue, setRevealQueue] = useState<Trophy[]>([]);
+  useEffect(() => {
+    if (state.loading) return;
+    const met = evaluateTrophies(state);
+    const newly = met.filter((id) => !state.badges.includes(id));
+    if (newly.length) {
+      dispatch({ type: "AWARD_BADGES", ids: newly });
+      if (trophySeeded.current) {
+        const ts = newly
+          .map((id) => TROPHIES.find((t) => t.id === id))
+          .filter((t): t is Trophy => !!t);
+        if (ts.length) setRevealQueue((q) => [...q, ...ts]);
+      }
+    }
+    trophySeeded.current = true;
+  }, [
+    state.loading,
+    state.streak,
+    state.saved,
+    state.urgesSkipped,
+    state.wants,
+    state.goals,
+    state.spending,
+    state.currentWeek,
+    state.badges,
+    dispatch,
+  ]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000);
@@ -366,6 +404,11 @@ export default function App() {
       />
 
       <Confetti trigger={state.confettiKey} />
+
+      <TrophyReveal
+        trophy={revealQueue[0] ?? null}
+        onDone={() => setRevealQueue((q) => q.slice(1))}
+      />
     </div>
   );
 }

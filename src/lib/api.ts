@@ -403,6 +403,16 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         }
         return true;
       }
+      case "AWARD_BADGES": {
+        const merged = Array.from(
+          new Set([...prev.badges, ...action.ids])
+        );
+        await supabase
+          .from("app_state")
+          .update({ badges: merged })
+          .eq("id", 1);
+        return true;
+      }
       case "SET_BUDGET":
         await supabase
           .from("app_state")
