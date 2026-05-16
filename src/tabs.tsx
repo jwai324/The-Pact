@@ -2130,7 +2130,7 @@ export const TasksTab = ({
         onClick={() => openSheet("addTask", {})}
       >
         <Icon name="plus" size={18} strokeWidth={2.6} color="var(--ink)" /> Add
-        a step
+        a task
       </Button>
 
       {/* Grouped tasks */}
