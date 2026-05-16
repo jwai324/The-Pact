@@ -67,12 +67,29 @@ export default function App() {
     pact: <PactTab state={state} dispatch={dispatch} openSheet={openSheet} />,
   };
 
+  // Live date for the header eyebrows (re-derived from `now`, which ticks
+  // every 30s, so it stays correct across midnight).
+  const dateLabel = new Date(now)
+    .toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    })
+    .toUpperCase()
+    .replace(", ", " · ");
+  const streakLabel = `${state.streak} ${
+    state.streak === 1 ? "WEEK" : "WEEKS"
+  } 🔥`;
+
   const tabTitle: Record<string, { eyebrow: string; title: string }> = {
-    today: { eyebrow: "TUE · MAY 5 · 6 WEEKS 🔥", title: "Hi, Maribett." },
+    today: {
+      eyebrow: `${dateLabel} · ${streakLabel}`,
+      title: "Hi, Maribett.",
+    },
     goals: { eyebrow: "ACTIVE QUESTS", title: "Quests" },
     tasks: { eyebrow: "THE NEXT STEPS", title: "Tasks" },
     wants: { eyebrow: "THE FRICTION LAYER", title: "Want List" },
-    spend: { eyebrow: "RESETS MONDAY", title: "Spending" },
+    spend: { eyebrow: `${dateLabel} · RESETS MON`, title: "Spending" },
     pact: { eyebrow: "WITH JUSTIN WAI", title: "The Pact" },
   };
 
