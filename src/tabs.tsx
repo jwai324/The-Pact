@@ -12,6 +12,7 @@ import {
   ProgressBar,
   StreakFlame,
   SegmentedControl,
+  Sheet,
   getLevel,
   formatCountdown,
 } from "./components/ui";
@@ -39,6 +40,60 @@ export const TodayTab = ({
     .filter((g) => g.status === "Fail" && !g.paid)
     .reduce((a, b) => a + Number(b.stake), 0);
   const { lvl, next } = getLevel(state.streak);
+
+  const trophies = [
+    {
+      name: "First Pass",
+      icon: "check",
+      color: "var(--green)",
+      how: "Pass your very first weekly goal. Complete any goal before its deadline to unlock this.",
+    },
+    {
+      name: "4-Week",
+      icon: "flame",
+      color: "var(--accent)",
+      how: "Keep your streak alive for 4 weeks straight — every weekly goal passed, no fails.",
+    },
+    {
+      name: "5 Skips",
+      icon: "shield",
+      color: "var(--sky)",
+      how: "Resist temptation 5 times. Add an item to your want list and let the timer run out instead of buying it.",
+    },
+    {
+      name: "$200",
+      icon: "coin",
+      color: "var(--gold)",
+      how: "Save $200 by staying under your weekly spending limit. Every dollar you don't spend counts.",
+    },
+    {
+      name: "Clean",
+      icon: "sparkle",
+      color: "var(--teal)",
+      how: "Finish a full week with zero unplanned spending logged.",
+    },
+    {
+      name: "8-Week",
+      icon: "star",
+      color: "var(--magenta)",
+      how: "Hold an unbroken streak for 8 weeks. Double the 4-Week challenge.",
+    },
+    {
+      name: "$500",
+      icon: "trophy",
+      color: "var(--purple)",
+      how: "Reach $500 in total savings. The big one — discipline pays off.",
+    },
+    {
+      name: "Mastery",
+      icon: "crown",
+      color: "var(--gold)",
+      how: "Earn every other trophy in the cabinet to claim ultimate Mastery.",
+    },
+  ];
+  const [openTrophy, setOpenTrophy] = useState<
+    (typeof trophies)[number] | null
+  >(null);
 
   return (
     <div
@@ -404,7 +459,7 @@ export const TodayTab = ({
               fontWeight: 700,
             }}
           >
-            {state.badges.length}/8
+            0/8
           </span>
         </div>
         <div
@@ -414,25 +469,24 @@ export const TodayTab = ({
             gap: 10,
           }}
         >
-          {[
-            { name: "First Pass", icon: "check", color: "var(--green)", earned: true },
-            { name: "4-Week", icon: "flame", color: "var(--accent)", earned: true },
-            { name: "5 Skips", icon: "shield", color: "var(--sky)", earned: true },
-            { name: "$200", icon: "coin", color: "var(--gold)", earned: true },
-            { name: "Clean", icon: "sparkle", color: "var(--teal)", earned: true },
-            { name: "8-Week", icon: "star", color: "var(--magenta)", earned: false },
-            { name: "$500", icon: "trophy", color: "var(--purple)", earned: false },
-            { name: "Mastery", icon: "crown", color: "var(--gold)", earned: false },
-          ].map((b) => (
-            <div
+          {trophies.map((b) => (
+            <button
               key={b.name}
+              type="button"
+              onClick={() => setOpenTrophy(b)}
+              aria-label={`How to earn ${b.name}`}
               style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 4,
-                opacity: b.earned ? 1 : 0.32,
-                filter: b.earned ? "none" : "grayscale(0.5)",
+                opacity: 0.32,
+                filter: "grayscale(0.5)",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                font: "inherit",
               }}
             >
               <div
@@ -440,9 +494,9 @@ export const TodayTab = ({
                   width: 48,
                   height: 48,
                   borderRadius: 14,
-                  background: b.earned ? b.color : "white",
+                  background: "white",
                   border: "2px solid var(--ink)",
-                  boxShadow: b.earned ? `2px 2px 0 var(--ink)` : "none",
+                  boxShadow: "none",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -467,10 +521,62 @@ export const TodayTab = ({
               >
                 {b.name}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </Card>
+
+      <Sheet
+        open={!!openTrophy}
+        onClose={() => setOpenTrophy(null)}
+        title={openTrophy ? `${openTrophy.name} 🔒` : ""}
+      >
+        {openTrophy && (
+          <>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 20,
+                  background: openTrophy.color,
+                  border: "2px solid var(--ink)",
+                  boxShadow: "3px 3px 0 var(--ink)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Icon
+                  name={openTrophy.icon}
+                  size={34}
+                  color="white"
+                  strokeWidth={2.2}
+                />
+              </div>
+            </div>
+            <Eyebrow>How to earn it</Eyebrow>
+            <div
+              style={{
+                fontFamily: "var(--body)",
+                fontSize: 15,
+                color: "var(--ink-soft)",
+                marginTop: 8,
+                lineHeight: 1.55,
+                fontWeight: 500,
+              }}
+            >
+              {openTrophy.how}
+            </div>
+          </>
+        )}
+      </Sheet>
     </div>
   );
 };
