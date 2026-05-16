@@ -111,5 +111,6 @@ export type Action =
   | { type: "DELETE_WANT"; id: string }
   | { type: "DELETE_SPEND"; id: string }
   | { type: "RESET_URGES" }
+  | { type: "AWARD_BADGES"; ids: string[] }
   | { type: "SET_BUDGET"; amount: number }
   | { type: "LOG_PAYMENT"; amount: number; note: string; proofUrl: string };
