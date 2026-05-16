@@ -788,6 +788,8 @@ export const GoalsTab = ({
 }) => {
   const [sub, setSub] = useState<string>("Weekly");
   const filtered = state.goals.filter((g) => g.category === sub);
+  const activeGoals = filtered.filter((g) => g.status === "Pending");
+  const historyGoals = filtered.filter((g) => g.status !== "Pending");
   const stakeByCat: Record<string, number> = {
     Weekly: 50,
     Monthly: 100,
@@ -857,7 +859,7 @@ export const GoalsTab = ({
                 marginTop: 2,
               }}
             >
-              {filtered.filter((g) => g.status === "Pending").length} open
+              {activeGoals.length} open
             </div>
           </div>
           <div
@@ -908,7 +910,7 @@ export const GoalsTab = ({
       </Card>
 
       <Card padded={false} style={{ padding: "8px 22px" }}>
-        {filtered.map((g, i) => (
+        {activeGoals.map((g, i) => (
           <div
             key={g.id}
             style={{
@@ -933,7 +935,7 @@ export const GoalsTab = ({
             />
           </div>
         ))}
-        {filtered.length === 0 && (
+        {activeGoals.length === 0 && (
           <div style={{ padding: "32px 0", textAlign: "center" }}>
             <div
               style={{
@@ -977,6 +979,41 @@ export const GoalsTab = ({
         />{" "}
         New {sub} Quest
       </Button>
+
+      {historyGoals.length > 0 && (
+        <div>
+          <Eyebrow style={{ marginBottom: 12, paddingLeft: 4 }}>
+            Quest History · {historyGoals.length}
+          </Eyebrow>
+          <Card padded={false} style={{ padding: "8px 22px" }}>
+            {historyGoals.map((g, i) => (
+              <div
+                key={g.id}
+                style={{
+                  padding: "16px 0",
+                  borderTop:
+                    i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+                }}
+              >
+                <GoalRow
+                  goal={g}
+                  dispatch={dispatch}
+                  tasks={state.tasks.filter((t) => t.goalId === g.id)}
+                  hideStake={g.category === "Side"}
+                  onDelete={() => {
+                    if (
+                      window.confirm(
+                        `Delete "${g.title}"? Its tasks are removed too. This can't be undone.`
+                      )
+                    )
+                      dispatch({ type: "DELETE_GOAL", id: g.id });
+                  }}
+                />
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
