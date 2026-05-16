@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>The Pact — Maribett</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Newsreader:wght@400;500&family=Cormorant+Garamond:wght@400;500&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    /* Bright playful palette */
+    --bg: #FFF6E5;             /* sunny cream */
+    --paper: #FFFFFF;
+    --paper-deep: #FFF0D2;
+    --ink: #1B1140;            /* deep grape ink */
+    --ink-soft: #4F3F87;
+    --muted: #8E83B5;
+    --border: #F0E2C0;
+    --border-deep: #E0CC9A;
+
+    --accent: #FF5A3C;         /* hot coral */
+    --accent-deep: #DD3618;
+    --accent-soft: #FFD9CF;
+
+    --magenta: #E63992;
+    --magenta-soft: #FFD3E8;
+    --purple: #7B5CFF;
+    --purple-soft: #DCD2FF;
+    --teal: #1FBFA8;
+    --teal-soft: #BFF0E8;
+    --green: #2DC55E;          /* pass */
+    --green-soft: #C7F0D5;
+    --lime: #B8FF3C;           /* electric lime accent */
+    --lime-deep: #7FCC00;
+    --lime-soft: #E8FFB8;
+    --red: #E84545;
+    --red-soft: #FFD0D0;
+    --gold: #FFB300;
+    --gold-soft: #FFEAB0;
+    --sky: #34B6FF;
+    --sky-soft: #C9E9FF;
+
+    --display: 'Fraunces', serif;
+    --body: 'Geist', system-ui, sans-serif;
+    --mono: 'Geist Mono', ui-monospace, monospace;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: var(--body); color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    background: var(--bg);
+    overscroll-behavior-y: none;
+  }
+  html { height: 100%; }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+  input, textarea, select { font-family: inherit; font-size: 16px; }
+  * { box-sizing: border-box; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+  /* Mobile-optimized app shell */
+  #root {
+    display: flex; justify-content: center;
+    min-height: 100vh; min-height: 100dvh;
+    background: var(--bg);
+  }
+  .app-shell {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: var(--bg);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    /* shadow only on desktop where there's space around the column */
+    box-shadow: 0 0 0 2px var(--ink), 8px 8px 0 var(--ink);
+  }
+  @media (max-width: 520px) {
+    .app-shell { box-shadow: none; max-width: 100%; }
+  }
+  /* Desktop: surrounding decoration */
+  @media (min-width: 521px) {
+    body {
+      background:
+        radial-gradient(circle at 18% 22%, #FFB3D8 0%, transparent 38%),
+        radial-gradient(circle at 82% 28%, #FFD56B 0%, transparent 38%),
+        radial-gradient(circle at 50% 82%, #B8A5FF 0%, transparent 42%),
+        #FFF1E0;
+      padding: 32px 20px;
+    }
+    #root { align-items: flex-start; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 4px 0 var(--green-deep, #1FA046), 0 8px 24px rgba(45,197,94,0.4); }
+    50% { box-shadow: 0 4px 0 var(--green-deep, #1FA046), 0 8px 32px rgba(45,197,94,0.7), 0 0 0 6px rgba(45,197,94,0.15); }
+  }
+  @keyframes flameWiggle {
+    0%, 100% { transform: rotate(-3deg) scale(1); }
+    50% { transform: rotate(3deg) scale(1.05); }
+  }
+  @keyframes pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    60% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes shine {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  @keyframes spin360 {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="module" src="/src/main.tsx"></script>
+
+</body>
+</html>
