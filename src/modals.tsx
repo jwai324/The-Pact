@@ -277,6 +277,51 @@ export const LogSpendSheet = ({
   );
 };
 
+export const EditBudgetSheet = ({
+  open,
+  onClose,
+  dispatch,
+  current,
+}: {
+  open: boolean;
+  onClose: () => void;
+  dispatch: Dispatch;
+  current: number;
+}) => {
+  const [amount, setAmount] = useState(String(current));
+  useEffect(() => {
+    if (open) setAmount(String(current));
+  }, [open, current]);
+  const submit = () => {
+    const n = Number(amount);
+    if (!amount || !Number.isFinite(n) || n <= 0) return;
+    dispatch({ type: "SET_BUDGET", amount: n });
+    onClose();
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Weekly budget">
+      <Field label="How much can you spend each week?">
+        <Input
+          value={amount}
+          onChange={setAmount}
+          prefix="$"
+          inputMode="decimal"
+          placeholder="125"
+        />
+      </Field>
+      <Button
+        variant="primary"
+        fullWidth
+        size="lg"
+        onClick={submit}
+        style={{ marginTop: 8 }}
+      >
+        Save budget
+      </Button>
+    </Sheet>
+  );
+};
+
 export const LogPaymentSheet = ({
   open,
   onClose,
