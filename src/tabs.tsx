@@ -588,6 +588,7 @@ export const GoalRow = ({
   tasks = [],
   hideStake = false,
   onAddTask,
+  onDelete,
 }: {
   goal: Goal;
   dispatch: Dispatch;
@@ -595,6 +596,7 @@ export const GoalRow = ({
   tasks?: Task[];
   hideStake?: boolean;
   onAddTask?: () => void;
+  onDelete?: () => void;
 }) => {
   const tone =
     goal.status === "Pass" ? "pass" : goal.status === "Fail" ? "fail" : "pending";
@@ -743,6 +745,31 @@ export const GoalRow = ({
           }}
         >
           ↺ undo
+        </button>
+      )}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          aria-label={`Delete quest: ${goal.title}`}
+          style={{
+            marginTop: 12,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontFamily: "var(--mono)",
+            fontSize: 11,
+            color: "var(--red)",
+            textDecoration: "underline",
+            letterSpacing: "0.04em",
+            fontWeight: 600,
+          }}
+        >
+          <Icon name="x" size={12} strokeWidth={2.6} color="var(--red)" />{" "}
+          Delete quest
         </button>
       )}
     </div>
@@ -895,6 +922,14 @@ export const GoalsTab = ({
               tasks={state.tasks.filter((t) => t.goalId === g.id)}
               hideStake={g.category === "Side"}
               onAddTask={() => openSheet("addTask", { goalId: g.id })}
+              onDelete={() => {
+                if (
+                  window.confirm(
+                    `Delete "${g.title}"? Its tasks are removed too. This can't be undone.`
+                  )
+                )
+                  dispatch({ type: "DELETE_GOAL", id: g.id });
+              }}
             />
           </div>
         ))}

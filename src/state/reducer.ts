@@ -164,6 +164,14 @@ export function reducer(state: State, action: Action): State {
         ...state,
         tasks: state.tasks.filter((t) => t.id !== action.id),
       };
+    case "DELETE_GOAL":
+      // Mirror the DB's ON DELETE CASCADE so optimistic state stays
+      // consistent before the refetch reconciles.
+      return {
+        ...state,
+        goals: state.goals.filter((g) => g.id !== action.id),
+        tasks: state.tasks.filter((t) => t.goalId !== action.id),
+      };
     case "LOG_PAYMENT": {
       let remaining = action.amount;
       const goals = state.goals.map((g) => {

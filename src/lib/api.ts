@@ -245,6 +245,10 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
       case "DELETE_TASK":
         await supabase.from("tasks").delete().eq("id", action.id);
         return true;
+      case "DELETE_GOAL":
+        // tasks rows cascade-delete via the goal_id FK (schema 0001).
+        await supabase.from("goals").delete().eq("id", action.id);
+        return true;
       case "LOG_PAYMENT": {
         let remaining = action.amount;
         const paidIds: string[] = [];
