@@ -126,12 +126,18 @@ export async function fetchAll(): Promise<DataSlice> {
 export async function persist(action: Action, prev: State): Promise<boolean> {
   try {
     switch (action.type) {
-      case "PASS_GOAL":
+      case "PASS_GOAL": {
+        const g = prev.goals.find((x) => x.id === action.id);
         await supabase
           .from("goals")
           .update({ status: "Pass", relative: "passed today" })
           .eq("id", action.id);
+        await supabase
+          .from("app_state")
+          .update({ saved: prev.saved + Number(g?.stake ?? 0) })
+          .eq("id", 1);
         return true;
+      }
       case "FAIL_GOAL": {
         const g = prev.goals.find((x) => x.id === action.id);
         await supabase
@@ -143,12 +149,20 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .eq("id", action.id);
         return true;
       }
-      case "RESET_GOAL":
+      case "RESET_GOAL": {
+        const g = prev.goals.find((x) => x.id === action.id);
         await supabase
           .from("goals")
           .update({ status: "Pending", relative: null })
           .eq("id", action.id);
+        if (g?.status === "Pass") {
+          await supabase
+            .from("app_state")
+            .update({ saved: Math.max(0, prev.saved - Number(g.stake)) })
+            .eq("id", 1);
+        }
         return true;
+      }
       case "OPEN_LOCKIN": {
         const weeklyStakes = prev.goals
           .filter((g) => g.category === "Weekly" && g.status === "Pass")
@@ -162,10 +176,7 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
       case "CLOSE_LOCKIN": {
         await supabase
           .from("app_state")
-          .update({
-            streak: prev.streak + 1,
-            saved: prev.saved + prev.lastLockedStakes,
-          })
+          .update({ streak: prev.streak + 1 })
           .eq("id", 1);
         await supabase
           .from("goals")

@@ -40,9 +40,13 @@ export function reducer(state: State, action: Action): State {
       return { ...state, sheet: action.sheet, sheetData: action.data || {} };
     case "CLOSE_SHEET":
       return { ...state, sheet: null };
-    case "PASS_GOAL":
+    case "PASS_GOAL": {
+      // Passing a quest means its stake never reaches the anti-charity, so
+      // credit it to the home "Saved from anti-charity" total immediately.
+      const passed = state.goals.find((g) => g.id === action.id);
       return {
         ...state,
+        saved: state.saved + Number(passed?.stake ?? 0),
         goals: state.goals.map((g) =>
           g.id === action.id
             ? { ...g, status: "Pass", relative: "passed today" }
@@ -50,6 +54,7 @@ export function reducer(state: State, action: Action): State {
         ),
         confettiKey: state.confettiKey + 1,
       };
+    }
     case "FAIL_GOAL":
       return {
         ...state,
@@ -57,15 +62,22 @@ export function reducer(state: State, action: Action): State {
           g.id === action.id ? { ...g, status: "Fail" } : g
         ),
       };
-    case "RESET_GOAL":
+    case "RESET_GOAL": {
+      // Undoing a pass returns the stake to "at risk", so reverse the credit
+      // PASS_GOAL applied. Clamp at 0 to stay safe for goals that were already
+      // "Pass" before per-pass crediting existed.
+      const reset = state.goals.find((g) => g.id === action.id);
+      const refund = reset?.status === "Pass" ? Number(reset.stake) : 0;
       return {
         ...state,
+        saved: Math.max(0, state.saved - refund),
         goals: state.goals.map((g) =>
           g.id === action.id
             ? { ...g, status: "Pending", relative: computeRelative(g.category) }
             : g
         ),
       };
+    }
     case "OPEN_LOCKIN": {
       const weeklyStakes = state.goals
         .filter((g) => g.category === "Weekly" && g.status === "Pass")
@@ -73,12 +85,13 @@ export function reducer(state: State, action: Action): State {
       return { ...state, lockInOpen: true, lastLockedStakes: weeklyStakes };
     }
     case "CLOSE_LOCKIN": {
-      const weeklyStakes = state.lastLockedStakes;
+      // Stakes are now credited to `saved` per pass (PASS_GOAL), so the weekly
+      // ritual no longer adds them again — it just advances the streak and
+      // rolls Weekly quests over for the new week.
       return {
         ...state,
         lockInOpen: false,
         streak: state.streak + 1,
-        saved: state.saved + weeklyStakes,
         goals: state.goals.map((g) =>
           g.category === "Weekly"
             ? { ...g, status: "Pending", relative: "due Sun" }
