@@ -2,10 +2,12 @@
 import {
   useState,
   useEffect,
+  useRef,
   type CSSProperties,
   type ReactNode,
   type SVGProps,
   type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 
 export const Icon = ({
@@ -662,6 +664,34 @@ export const Sheet = ({
       };
     }
   }, [open]);
+
+  // Swipe-down-to-dismiss from the grab handle. Drag follows the finger;
+  // releasing past the threshold closes the sheet, otherwise it snaps back.
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startY = useRef(0);
+  const DISMISS_PX = 110;
+  useEffect(() => {
+    setDragY(0);
+    setDragging(false);
+  }, [open]);
+  const onHandleDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    startY.current = e.clientY;
+    setDragY(0);
+    setDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onHandleMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!dragging) return;
+    const dy = e.clientY - startY.current;
+    setDragY(dy > 0 ? dy : 0);
+  };
+  const onHandleUp = () => {
+    if (!dragging) return;
+    setDragging(false);
+    if (dragY > DISMISS_PX) onClose();
+  };
+
   return (
     <>
       <div
@@ -670,9 +700,13 @@ export const Sheet = ({
           position: "fixed",
           inset: 0,
           background: "rgba(27, 17, 64, 0.5)",
-          opacity: open ? 1 : 0,
+          opacity: open
+            ? dragging
+              ? Math.max(0.15, 1 - dragY / 400)
+              : 1
+            : 0,
           pointerEvents: open ? "auto" : "none",
-          transition: "opacity 220ms ease",
+          transition: dragging ? "none" : "opacity 220ms ease",
           zIndex: 100,
         }}
       />
@@ -685,14 +719,20 @@ export const Sheet = ({
           width: "100%",
           maxWidth: 480,
           transform: `translateX(-50%) ${
-            open ? "translateY(0)" : "translateY(100%)"
+            dragging
+              ? `translateY(${dragY}px)`
+              : open
+              ? "translateY(0)"
+              : "translateY(100%)"
           }`,
           background: "var(--paper)",
           borderRadius: "24px 24px 0 0",
           border: "2px solid var(--ink)",
           borderBottom: "none",
           padding: "10px 20px calc(28px + env(safe-area-inset-bottom))",
-          transition: "transform 320ms cubic-bezier(0.32, 0.72, 0, 1)",
+          transition: dragging
+            ? "none"
+            : "transform 320ms cubic-bezier(0.32, 0.72, 0, 1)",
           maxHeight: "85dvh",
           overflow: "auto",
           visibility: open ? "visible" : "hidden",
@@ -700,10 +740,20 @@ export const Sheet = ({
         }}
       >
         <div
+          onPointerDown={onHandleDown}
+          onPointerMove={onHandleMove}
+          onPointerUp={onHandleUp}
+          onPointerCancel={onHandleUp}
           style={{
             display: "flex",
             justifyContent: "center",
+            alignItems: "center",
+            paddingTop: 6,
             paddingBottom: 14,
+            margin: "-6px -20px 0",
+            touchAction: "none",
+            cursor: dragging ? "grabbing" : "grab",
+            userSelect: "none",
           }}
         >
           <div
