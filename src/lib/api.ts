@@ -35,6 +35,23 @@ export async function fetchAll(): Promise<DataSlice> {
         .order("created_at", { ascending: false }),
     ]);
 
+  // Surface a failed read instead of silently treating it as "no data".
+  // supabase-js resolves (does not reject) on query errors, so without this
+  // an auth/network failure would yield empty arrays here and the store's
+  // post-write refetch would HYDRATE that emptiness over good optimistic /
+  // seeded state (the "shows up then disappears" bug). Throwing instead lets
+  // the store dispatch LOAD_FAILED, which preserves current state.
+  const firstError =
+    appStateRes.error ||
+    goalsRes.error ||
+    tasksRes.error ||
+    wantsRes.error ||
+    spendRes.error ||
+    payRes.error;
+  if (firstError) {
+    throw new Error(`fetchAll failed: ${firstError.message}`);
+  }
+
   const a = appStateRes.data;
 
   const goals: Goal[] = (goalsRes.data || []).map((g) => ({
