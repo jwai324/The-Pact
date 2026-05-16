@@ -2248,6 +2248,24 @@ const TaskRow = ({
   dispatch: Dispatch;
   first: boolean;
 }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(task.title);
+
+  const startEdit = () => {
+    setDraft(task.title);
+    setEditing(true);
+  };
+  const commit = () => {
+    const next = draft.trim();
+    if (next && next !== task.title)
+      dispatch({ type: "EDIT_TASK", id: task.id, title: next });
+    setEditing(false);
+  };
+  const cancel = () => {
+    setDraft(task.title);
+    setEditing(false);
+  };
+
   return (
     <div
       style={{
@@ -2284,19 +2302,58 @@ const TaskRow = ({
         )}
       </button>
       <div style={{ flex: 1, paddingTop: 2 }}>
-        <div
-          style={{
-            fontFamily: "var(--body)",
-            fontSize: 14.5,
-            lineHeight: 1.35,
-            fontWeight: 500,
-            color: task.done ? "var(--ink-soft)" : "var(--ink)",
-            textDecoration: task.done ? "line-through" : "none",
-            textDecorationThickness: "2px",
-          }}
-        >
-          {task.title}
-        </div>
+        {editing ? (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commit();
+              else if (e.key === "Escape") cancel();
+            }}
+            onBlur={commit}
+            aria-label="Edit task"
+            style={{
+              width: "100%",
+              fontFamily: "var(--body)",
+              fontSize: 14.5,
+              lineHeight: 1.35,
+              fontWeight: 500,
+              color: "var(--ink)",
+              background: "white",
+              border: "2px solid var(--ink)",
+              borderRadius: 8,
+              padding: "5px 8px",
+              outline: "none",
+            }}
+          />
+        ) : (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={startEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                startEdit();
+              }
+            }}
+            title="Click to edit"
+            style={{
+              fontFamily: "var(--body)",
+              fontSize: 14.5,
+              lineHeight: 1.35,
+              fontWeight: 500,
+              color: task.done ? "var(--ink-soft)" : "var(--ink)",
+              textDecoration: task.done ? "line-through" : "none",
+              textDecorationThickness: "2px",
+              cursor: "text",
+            }}
+          >
+            {task.title}
+          </div>
+        )}
         {task.minutes != null && (
           <div
             style={{
