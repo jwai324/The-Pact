@@ -30,6 +30,10 @@ export function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "HYDRATE":
       return { ...state, ...action.data, loading: false };
+    case "LOAD_FAILED":
+      // Initial fetch failed — leave defaults in place but drop the splash so
+      // the app shell renders instead of an indefinite "Loading…".
+      return { ...state, loading: false };
     case "TAB":
       return { ...state, tab: action.tab };
     case "OPEN_SHEET":
