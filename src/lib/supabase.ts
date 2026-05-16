@@ -1,10 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 
+// Built-in defaults so the app shows live data even when no env vars /
+// GitHub Actions secrets are configured. This is safe by design: the app
+// has no auth and the publishable key is meant to ship in the client
+// bundle (see .env.example). Env vars still take precedence so a different
+// project can be pointed at without code changes.
+const DEFAULT_SUPABASE_URL = "https://xvjsnfbvywavzdrjdfvi.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_FxpzEQdH-DNy6xti0DffdQ_PTYcnKdJ";
+
 // Trimmed so a secret pasted with a trailing newline/space (a very common
 // mistake for GitHub Actions secrets) doesn't slip through as "present but
 // malformed".
-const url = import.meta.env.VITE_SUPABASE_URL?.trim();
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+const url =
+  import.meta.env.VITE_SUPABASE_URL?.trim() || DEFAULT_SUPABASE_URL;
+const key =
+  import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() || DEFAULT_SUPABASE_ANON_KEY;
 
 const PLACEHOLDER_URL = "https://placeholder.supabase.co";
 const PLACEHOLDER_KEY = "placeholder";
