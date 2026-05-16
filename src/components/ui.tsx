@@ -809,6 +809,85 @@ export const Input = ({
   </div>
 );
 
+export const InlineEditText = ({
+  value,
+  onCommit,
+  ariaLabel,
+  textStyle = {},
+  inputStyle = {},
+}: {
+  value: string;
+  onCommit: (next: string) => void;
+  ariaLabel: string;
+  textStyle?: CSSProperties;
+  inputStyle?: CSSProperties;
+}) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  const startEdit = () => {
+    setDraft(value);
+    setEditing(true);
+  };
+  const commit = () => {
+    const next = draft.trim();
+    if (next && next !== value) onCommit(next);
+    setEditing(false);
+  };
+  const cancel = () => {
+    setDraft(value);
+    setEditing(false);
+  };
+
+  if (editing)
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          else if (e.key === "Escape") cancel();
+        }}
+        onBlur={commit}
+        aria-label={ariaLabel}
+        style={{
+          width: "100%",
+          background: "white",
+          border: "2px solid var(--ink)",
+          borderRadius: 8,
+          padding: "5px 8px",
+          outline: "none",
+          fontFamily: "var(--body)",
+          lineHeight: 1.35,
+          color: "var(--ink)",
+          ...textStyle,
+          textDecoration: "none",
+          ...inputStyle,
+        }}
+      />
+    );
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={startEdit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          startEdit();
+        }
+      }}
+      title="Click to edit"
+      style={{ cursor: "text", ...textStyle }}
+    >
+      {value}
+    </div>
+  );
+};
+
 type SegOption = string | { value: string | number; label: string };
 
 export const SegmentedControl = ({

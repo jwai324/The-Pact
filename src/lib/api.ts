@@ -274,6 +274,12 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .update({ title: action.title })
           .eq("id", action.id);
         return true;
+      case "EDIT_GOAL":
+        await supabase
+          .from("goals")
+          .update({ title: action.title })
+          .eq("id", action.id);
+        return true;
       case "DELETE_TASK":
         await supabase.from("tasks").delete().eq("id", action.id);
         return true;

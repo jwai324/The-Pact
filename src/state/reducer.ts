@@ -197,6 +197,13 @@ export function reducer(state: State, action: Action): State {
           t.id === action.id ? { ...t, title: action.title } : t
         ),
       };
+    case "EDIT_GOAL":
+      return {
+        ...state,
+        goals: state.goals.map((g) =>
+          g.id === action.id ? { ...g, title: action.title } : g
+        ),
+      };
     case "DELETE_TASK":
       return {
         ...state,

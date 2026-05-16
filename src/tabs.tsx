@@ -13,6 +13,7 @@ import {
   StreakFlame,
   SegmentedControl,
   Sheet,
+  InlineEditText,
   getLevel,
   formatCountdown,
 } from "./components/ui";
@@ -613,17 +614,21 @@ export const GoalRow = ({
         }}
       >
         <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontFamily: "var(--body)",
-              fontSize: 15,
-              fontWeight: 600,
-              color: "var(--ink)",
-              lineHeight: 1.35,
-              marginBottom: 5,
-            }}
-          >
-            {goal.title}
+          <div style={{ marginBottom: 5 }}>
+            <InlineEditText
+              value={goal.title}
+              ariaLabel="Edit quest"
+              onCommit={(title) =>
+                dispatch({ type: "EDIT_GOAL", id: goal.id, title })
+              }
+              textStyle={{
+                fontFamily: "var(--body)",
+                fontSize: 15,
+                fontWeight: 600,
+                color: "var(--ink)",
+                lineHeight: 1.35,
+              }}
+            />
           </div>
           <div
             style={{
@@ -2285,24 +2290,6 @@ const TaskRow = ({
   dispatch: Dispatch;
   first: boolean;
 }) => {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(task.title);
-
-  const startEdit = () => {
-    setDraft(task.title);
-    setEditing(true);
-  };
-  const commit = () => {
-    const next = draft.trim();
-    if (next && next !== task.title)
-      dispatch({ type: "EDIT_TASK", id: task.id, title: next });
-    setEditing(false);
-  };
-  const cancel = () => {
-    setDraft(task.title);
-    setEditing(false);
-  };
-
   return (
     <div
       style={{
@@ -2339,58 +2326,22 @@ const TaskRow = ({
         )}
       </button>
       <div style={{ flex: 1, paddingTop: 2 }}>
-        {editing ? (
-          <input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") commit();
-              else if (e.key === "Escape") cancel();
-            }}
-            onBlur={commit}
-            aria-label="Edit task"
-            style={{
-              width: "100%",
-              fontFamily: "var(--body)",
-              fontSize: 14.5,
-              lineHeight: 1.35,
-              fontWeight: 500,
-              color: "var(--ink)",
-              background: "white",
-              border: "2px solid var(--ink)",
-              borderRadius: 8,
-              padding: "5px 8px",
-              outline: "none",
-            }}
-          />
-        ) : (
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={startEdit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                startEdit();
-              }
-            }}
-            title="Click to edit"
-            style={{
-              fontFamily: "var(--body)",
-              fontSize: 14.5,
-              lineHeight: 1.35,
-              fontWeight: 500,
-              color: task.done ? "var(--ink-soft)" : "var(--ink)",
-              textDecoration: task.done ? "line-through" : "none",
-              textDecorationThickness: "2px",
-              cursor: "text",
-            }}
-          >
-            {task.title}
-          </div>
-        )}
+        <InlineEditText
+          value={task.title}
+          ariaLabel="Edit task"
+          onCommit={(title) =>
+            dispatch({ type: "EDIT_TASK", id: task.id, title })
+          }
+          textStyle={{
+            fontFamily: "var(--body)",
+            fontSize: 14.5,
+            lineHeight: 1.35,
+            fontWeight: 500,
+            color: task.done ? "var(--ink-soft)" : "var(--ink)",
+            textDecoration: task.done ? "line-through" : "none",
+            textDecorationThickness: "2px",
+          }}
+        />
         {task.minutes != null && (
           <div
             style={{

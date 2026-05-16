@@ -93,6 +93,7 @@ export type Action =
   | { type: "ADD_TASK"; goalId: string; title: string; minutes: number | null }
   | { type: "TOGGLE_TASK"; id: string }
   | { type: "EDIT_TASK"; id: string; title: string }
+  | { type: "EDIT_GOAL"; id: string; title: string }
   | { type: "DELETE_TASK"; id: string }
   | { type: "DELETE_GOAL"; id: string }
   | { type: "DELETE_WANT"; id: string }
