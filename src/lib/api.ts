@@ -206,6 +206,11 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .update({ status: "Pass", relative: "passed today" })
           .eq("id", action.id);
         await supabase
+          .from("tasks")
+          .update({ done: true })
+          .eq("goal_id", action.id)
+          .eq("done", false);
+        await supabase
           .from("app_state")
           .update({ saved: prev.saved + Number(g?.stake ?? 0) })
           .eq("id", 1);

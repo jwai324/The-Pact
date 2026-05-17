@@ -57,6 +57,9 @@ export function reducer(state: State, action: Action): State {
             ? { ...g, status: "Pass", relative: "passed today" }
             : g
         ),
+        tasks: state.tasks.map((t) =>
+          t.goalId === action.id && !t.done ? { ...t, done: true } : t
+        ),
         confettiKey: state.confettiKey + 1,
       };
     }
