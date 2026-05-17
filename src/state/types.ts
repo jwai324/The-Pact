@@ -118,6 +118,8 @@ export type Action =
   | { type: "DELETE_SPEND"; id: string }
   | { type: "RESET_URGES" }
   | { type: "AWARD_BADGES"; ids: string[]; active: string[] }
+  | { type: "ADD_BADGE"; id: string }
+  | { type: "REMOVE_BADGE"; id: string }
   | { type: "SET_BUDGET"; amount: number }
   | { type: "SET_STREAK"; value: number }
   | { type: "SET_SAVED"; value: number }

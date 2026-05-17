@@ -160,6 +160,23 @@ export function reducer(state: State, action: Action): State {
       for (const id of action.ids) badges[id] = (badges[id] ?? 0) + 1;
       return { ...state, badges, activeTrophies: action.active };
     }
+    case "ADD_BADGE": {
+      // Manual earn (hidden Future Quests screen). Bumps the lifetime count
+      // only; activeTrophies is left to the evaluator (badges isn't an
+      // evaluator dep, so this won't trigger a re-award).
+      const badges = { ...state.badges };
+      badges[action.id] = (badges[action.id] ?? 0) + 1;
+      return { ...state, badges };
+    }
+    case "REMOVE_BADGE": {
+      // Manual un-earn: decrement by one, dropping the key at zero so the
+      // cabinet reads it as locked.
+      const badges = { ...state.badges };
+      const next = (badges[action.id] ?? 0) - 1;
+      if (next > 0) badges[action.id] = next;
+      else delete badges[action.id];
+      return { ...state, badges };
+    }
     case "SET_BUDGET":
       return { ...state, weeklyBudget: action.amount };
     case "SET_STREAK":

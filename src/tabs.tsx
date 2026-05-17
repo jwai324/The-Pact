@@ -1226,6 +1226,83 @@ export const FutureQuestsTab = ({
       </Card>
 
       <Card padded={false} style={{ padding: "8px 22px" }}>
+        <div
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            color: "var(--ink-soft)",
+            padding: "14px 0 2px",
+          }}
+        >
+          Trophies
+        </div>
+        {TROPHIES.map((t, i) => {
+          const count = state.badges[t.id] ?? 0;
+          return (
+            <div
+              key={t.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "14px 0",
+                borderTop: i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: "var(--body)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {t.name}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "var(--ink-soft)",
+                    marginTop: 2,
+                  }}
+                >
+                  {count > 0
+                    ? `Earned${count > 1 ? ` ×${count}` : ""}`
+                    : "Locked"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={count === 0}
+                  onClick={() =>
+                    dispatch({ type: "REMOVE_BADGE", id: t.id })
+                  }
+                >
+                  -1
+                </Button>
+                <Button
+                  variant="purple"
+                  size="sm"
+                  onClick={() => dispatch({ type: "ADD_BADGE", id: t.id })}
+                >
+                  +1
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      <Card padded={false} style={{ padding: "8px 22px" }}>
         {quests.map((g, i) => (
           <div
             key={g.id}
