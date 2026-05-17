@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import { computeRelative } from "./helpers";
+import { computeRelative, currentWeek } from "./helpers";
+import type { Rollover } from "./helpers";
 import type {
   Action,
   Category,
@@ -54,19 +55,28 @@ export async function fetchAll(): Promise<DataSlice> {
 
   const a = appStateRes.data;
 
-  const goals: Goal[] = (goalsRes.data || []).map((g) => ({
-    id: g.id,
-    title: g.title,
-    category: g.category as Category,
-    stake: Number(g.stake),
-    status: g.status as GoalStatus,
-    relative:
-      g.status === "Pending"
+  const allGoals: Goal[] = (goalsRes.data || []).map((g) => {
+    const future = !!g.future;
+    return {
+      id: g.id,
+      title: g.title,
+      category: g.category as Category,
+      stake: Number(g.stake),
+      status: g.status as GoalStatus,
+      // Parked quests have no live deadline; only active Pending quests get
+      // a computed countdown.
+      relative: future
+        ? ""
+        : g.status === "Pending"
         ? computeRelative(g.category as Category)
         : g.relative || "",
-    paid: !!g.paid,
-    sort: g.sort,
-  }));
+      paid: !!g.paid,
+      sort: g.sort,
+      future,
+    };
+  });
+  const goals = allGoals.filter((g) => !g.future);
+  const futureGoals = allGoals.filter((g) => g.future);
 
   const tasks: Task[] = (tasksRes.data || []).map((t) => ({
     id: t.id,
@@ -113,11 +123,54 @@ export async function fetchAll(): Promise<DataSlice> {
     lastLockedStakes: a ? Number(a.last_locked_stakes) : 0,
     badges: (a?.badges as string[]) ?? [],
     goals,
+    futureGoals,
     tasks,
     wants,
     spending,
     payments,
+    // Must stay null when the column is absent/unset — that nullness is what
+    // makes the first sweep initialize instead of retro-failing old quests.
+    lastWeekKey: a?.last_week_key ?? null,
+    lastMonthKey: a?.last_month_key ?? null,
+    lastQuarterKey: a?.last_quarter_key ?? null,
   };
+}
+
+// Reconcile quests whose period ended while the app was closed: any still
+// "Pending" quest in a rolled-over category is failed (same effect as the
+// user pressing Fail), then the period keys are advanced. Called from the
+// store's refetch path BEFORE HYDRATE so the optimistic/persist `prev`
+// staleness can't drop these writes. Keys are written FIRST and the goals
+// update is filtered on status='Pending', so a partial failure or a
+// concurrent device re-running this is idempotent.
+export async function persistSweep(rollover: Rollover): Promise<boolean> {
+  try {
+    await supabase
+      .from("app_state")
+      .update({
+        last_week_key: rollover.newKeys.weekKey,
+        last_month_key: rollover.newKeys.monthKey,
+        last_quarter_key: rollover.newKeys.quarterKey,
+      })
+      .eq("id", 1);
+    const rolled: Category[] = [
+      ...(rollover.weekly ? (["Weekly"] as const) : []),
+      ...(rollover.monthly ? (["Monthly"] as const) : []),
+      ...(rollover.quarterly ? (["Quarterly"] as const) : []),
+    ];
+    for (const cat of rolled) {
+      await supabase
+        .from("goals")
+        .update({ status: "Fail" })
+        .eq("category", cat)
+        .eq("status", "Pending")
+        .eq("future", false);
+    }
+    return true;
+  } catch (err) {
+    console.error("[persistSweep] write failed", err);
+    return false;
+  }
 }
 
 // Mirror a dispatched action to Supabase. `prev` is state BEFORE the action.
@@ -126,12 +179,18 @@ export async function fetchAll(): Promise<DataSlice> {
 export async function persist(action: Action, prev: State): Promise<boolean> {
   try {
     switch (action.type) {
-      case "PASS_GOAL":
+      case "PASS_GOAL": {
+        const g = prev.goals.find((x) => x.id === action.id);
         await supabase
           .from("goals")
           .update({ status: "Pass", relative: "passed today" })
           .eq("id", action.id);
+        await supabase
+          .from("app_state")
+          .update({ saved: prev.saved + Number(g?.stake ?? 0) })
+          .eq("id", 1);
         return true;
+      }
       case "FAIL_GOAL": {
         const g = prev.goals.find((x) => x.id === action.id);
         await supabase
@@ -143,12 +202,20 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .eq("id", action.id);
         return true;
       }
-      case "RESET_GOAL":
+      case "RESET_GOAL": {
+        const g = prev.goals.find((x) => x.id === action.id);
         await supabase
           .from("goals")
           .update({ status: "Pending", relative: null })
           .eq("id", action.id);
+        if (g?.status === "Pass") {
+          await supabase
+            .from("app_state")
+            .update({ saved: Math.max(0, prev.saved - Number(g.stake)) })
+            .eq("id", 1);
+        }
         return true;
+      }
       case "OPEN_LOCKIN": {
         const weeklyStakes = prev.goals
           .filter((g) => g.category === "Weekly" && g.status === "Pass")
@@ -160,17 +227,18 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         return true;
       }
       case "CLOSE_LOCKIN": {
+        // Lock-in resets all Weekly quests to Pending for the new week. Bump
+        // last_week_key in lockstep so the next load's sweep doesn't see
+        // these fresh Pending quests against a stale key and fail them.
         await supabase
           .from("app_state")
-          .update({
-            streak: prev.streak + 1,
-            saved: prev.saved + prev.lastLockedStakes,
-          })
+          .update({ streak: prev.streak + 1, last_week_key: currentWeek().weekKey })
           .eq("id", 1);
         await supabase
           .from("goals")
           .update({ status: "Pending", relative: null })
-          .eq("category", "Weekly");
+          .eq("category", "Weekly")
+          .eq("future", false);
         return true;
       }
       case "ADD_WANT": {
@@ -201,6 +269,21 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         }
         return true;
       }
+      case "DELETE_WANT":
+        await supabase.from("wants").delete().eq("id", action.id);
+        return true;
+      case "DELETE_SPEND":
+        await supabase.from("spending").delete().eq("id", action.id);
+        return true;
+      case "RESET_URGES": {
+        // Erase decided history; pending wants (decision IS NULL) stay.
+        await supabase.from("wants").delete().not("decision", "is", null);
+        await supabase
+          .from("app_state")
+          .update({ urges_skipped: 0 })
+          .eq("id", 1);
+        return true;
+      }
       case "ADD_GOAL": {
         const nextSort = Math.max(0, ...prev.goals.map((g) => g.sort)) + 1;
         await supabase.from("goals").insert({
@@ -214,6 +297,38 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         });
         return true;
       }
+      case "ADD_FUTURE_GOAL": {
+        const nextSort =
+          Math.max(0, ...prev.futureGoals.map((g) => g.sort)) + 1;
+        await supabase.from("goals").insert({
+          title: action.title,
+          category: "Side",
+          stake: action.stake,
+          status: "Pending",
+          relative: null,
+          paid: false,
+          sort: nextSort,
+          future: true,
+        });
+        return true;
+      }
+      case "PUSH_FUTURE_GOAL": {
+        const nextSort = Math.max(0, ...prev.goals.map((g) => g.sort)) + 1;
+        await supabase
+          .from("goals")
+          .update({
+            category: action.category,
+            status: "Pending",
+            relative: null,
+            future: false,
+            sort: nextSort,
+          })
+          .eq("id", action.id);
+        return true;
+      }
+      case "DELETE_FUTURE_GOAL":
+        await supabase.from("goals").delete().eq("id", action.id);
+        return true;
       case "LOG_SPEND":
         await supabase.from("spending").insert({
           amount: action.amount,
@@ -242,8 +357,24 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .eq("id", action.id);
         return true;
       }
+      case "EDIT_TASK":
+        await supabase
+          .from("tasks")
+          .update({ title: action.title })
+          .eq("id", action.id);
+        return true;
+      case "EDIT_GOAL":
+        await supabase
+          .from("goals")
+          .update({ title: action.title })
+          .eq("id", action.id);
+        return true;
       case "DELETE_TASK":
         await supabase.from("tasks").delete().eq("id", action.id);
+        return true;
+      case "DELETE_GOAL":
+        // tasks rows cascade-delete via the goal_id FK (schema 0001).
+        await supabase.from("goals").delete().eq("id", action.id);
         return true;
       case "LOG_PAYMENT": {
         let remaining = action.amount;
@@ -272,6 +403,22 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         }
         return true;
       }
+      case "AWARD_BADGES": {
+        const merged = Array.from(
+          new Set([...prev.badges, ...action.ids])
+        );
+        await supabase
+          .from("app_state")
+          .update({ badges: merged })
+          .eq("id", 1);
+        return true;
+      }
+      case "SET_BUDGET":
+        await supabase
+          .from("app_state")
+          .update({ weekly_budget: action.amount })
+          .eq("id", 1);
+        return true;
       default:
         return false; // TAB / OPEN_SHEET / CLOSE_SHEET / HYDRATE — UI only
     }

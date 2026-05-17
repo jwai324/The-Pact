@@ -13,10 +13,12 @@ import {
   StreakFlame,
   SegmentedControl,
   Sheet,
+  InlineEditText,
   getLevel,
   formatCountdown,
 } from "./components/ui";
 import type { Action, Goal, State, Task, Want } from "./state/types";
+import { TROPHIES, type Trophy } from "./lib/trophies";
 
 type Dispatch = (a: Action) => void;
 type OpenSheet = (sheet: string, data?: State["sheetData"]) => void;
@@ -41,59 +43,10 @@ export const TodayTab = ({
     .reduce((a, b) => a + Number(b.stake), 0);
   const { lvl, next } = getLevel(state.streak);
 
-  const trophies = [
-    {
-      name: "First Pass",
-      icon: "check",
-      color: "var(--green)",
-      how: "Pass your very first weekly goal. Complete any goal before its deadline to unlock this.",
-    },
-    {
-      name: "4-Week",
-      icon: "flame",
-      color: "var(--accent)",
-      how: "Keep your streak alive for 4 weeks straight — every weekly goal passed, no fails.",
-    },
-    {
-      name: "5 Skips",
-      icon: "shield",
-      color: "var(--sky)",
-      how: "Resist temptation 5 times. Add an item to your want list and let the timer run out instead of buying it.",
-    },
-    {
-      name: "$200",
-      icon: "coin",
-      color: "var(--gold)",
-      how: "Save $200 by staying under your weekly spending limit. Every dollar you don't spend counts.",
-    },
-    {
-      name: "Clean",
-      icon: "sparkle",
-      color: "var(--teal)",
-      how: "Finish a full week with zero unplanned spending logged.",
-    },
-    {
-      name: "8-Week",
-      icon: "star",
-      color: "var(--magenta)",
-      how: "Hold an unbroken streak for 8 weeks. Double the 4-Week challenge.",
-    },
-    {
-      name: "$500",
-      icon: "trophy",
-      color: "var(--purple)",
-      how: "Reach $500 in total savings. The big one — discipline pays off.",
-    },
-    {
-      name: "Mastery",
-      icon: "crown",
-      color: "var(--gold)",
-      how: "Earn every other trophy in the cabinet to claim ultimate Mastery.",
-    },
-  ];
-  const [openTrophy, setOpenTrophy] = useState<
-    (typeof trophies)[number] | null
-  >(null);
+  const earnedCount = TROPHIES.filter((t) =>
+    state.badges.includes(t.id)
+  ).length;
+  const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
 
   return (
     <div
@@ -459,7 +412,7 @@ export const TodayTab = ({
               fontWeight: 700,
             }}
           >
-            0/8
+            {earnedCount}/{TROPHIES.length}
           </span>
         </div>
         <div
@@ -469,67 +422,77 @@ export const TodayTab = ({
             gap: 10,
           }}
         >
-          {trophies.map((b) => (
-            <button
-              key={b.name}
-              type="button"
-              onClick={() => setOpenTrophy(b)}
-              aria-label={`How to earn ${b.name}`}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 4,
-                opacity: 0.32,
-                filter: "grayscale(0.5)",
-                background: "none",
-                border: "none",
-                padding: 0,
-                cursor: "pointer",
-                font: "inherit",
-              }}
-            >
-              <div
+          {TROPHIES.map((t) => {
+            const earned = state.badges.includes(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setOpenTrophy(t)}
+                aria-label={`${t.name}${earned ? " (earned)" : " — how to earn"}`}
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 14,
-                  background: "white",
-                  border: "2px solid var(--ink)",
-                  boxShadow: "none",
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
-                  justifyContent: "center",
+                  gap: 4,
+                  opacity: earned ? 1 : 0.32,
+                  filter: earned ? "none" : "grayscale(0.5)",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  font: "inherit",
                 }}
               >
-                <Icon
-                  name={b.icon}
-                  size={22}
-                  color="white"
-                  strokeWidth={2.2}
-                />
-              </div>
-              <span
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 9.5,
-                  color: "var(--ink)",
-                  fontWeight: 600,
-                  letterSpacing: "0.02em",
-                  textAlign: "center",
-                }}
-              >
-                {b.name}
-              </span>
-            </button>
-          ))}
+                <div
+                  id={`trophy-slot-${t.id}`}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    background: earned ? t.color : "white",
+                    border: "2px solid var(--ink)",
+                    boxShadow: earned ? "2px 2px 0 var(--ink)" : "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Icon
+                    name={t.icon}
+                    size={22}
+                    color="white"
+                    strokeWidth={2.2}
+                  />
+                </div>
+                <span
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: 9.5,
+                    color: "var(--ink)",
+                    fontWeight: 600,
+                    letterSpacing: "0.02em",
+                    textAlign: "center",
+                  }}
+                >
+                  {t.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </Card>
 
       <Sheet
         open={!!openTrophy}
         onClose={() => setOpenTrophy(null)}
-        title={openTrophy ? `${openTrophy.name} 🔒` : ""}
+        title={
+          openTrophy
+            ? `${openTrophy.name} ${
+                state.badges.includes(openTrophy.id) ? "🏆" : "🔒"
+              }`
+            : ""
+        }
       >
         {openTrophy && (
           <>
@@ -561,7 +524,11 @@ export const TodayTab = ({
                 />
               </div>
             </div>
-            <Eyebrow>How to earn it</Eyebrow>
+            <Eyebrow>
+              {state.badges.includes(openTrophy.id)
+                ? "Earned"
+                : "How to earn it"}
+            </Eyebrow>
             <div
               style={{
                 fontFamily: "var(--body)",
@@ -588,6 +555,7 @@ export const GoalRow = ({
   tasks = [],
   hideStake = false,
   onAddTask,
+  onDelete,
 }: {
   goal: Goal;
   dispatch: Dispatch;
@@ -595,6 +563,7 @@ export const GoalRow = ({
   tasks?: Task[];
   hideStake?: boolean;
   onAddTask?: () => void;
+  onDelete?: () => void;
 }) => {
   const tone =
     goal.status === "Pass" ? "pass" : goal.status === "Fail" ? "fail" : "pending";
@@ -611,17 +580,21 @@ export const GoalRow = ({
         }}
       >
         <div style={{ flex: 1 }}>
-          <div
-            style={{
-              fontFamily: "var(--body)",
-              fontSize: 15,
-              fontWeight: 600,
-              color: "var(--ink)",
-              lineHeight: 1.35,
-              marginBottom: 5,
-            }}
-          >
-            {goal.title}
+          <div style={{ marginBottom: 5 }}>
+            <InlineEditText
+              value={goal.title}
+              ariaLabel="Edit quest"
+              onCommit={(title) =>
+                dispatch({ type: "EDIT_GOAL", id: goal.id, title })
+              }
+              textStyle={{
+                fontFamily: "var(--body)",
+                fontSize: 15,
+                fontWeight: 600,
+                color: "var(--ink)",
+                lineHeight: 1.35,
+              }}
+            />
           </div>
           <div
             style={{
@@ -745,6 +718,31 @@ export const GoalRow = ({
           ↺ undo
         </button>
       )}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          aria-label={`Delete quest: ${goal.title}`}
+          style={{
+            marginTop: 12,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontFamily: "var(--mono)",
+            fontSize: 11,
+            color: "var(--red)",
+            textDecoration: "underline",
+            letterSpacing: "0.04em",
+            fontWeight: 600,
+          }}
+        >
+          <Icon name="x" size={12} strokeWidth={2.6} color="var(--red)" />{" "}
+          Delete quest
+        </button>
+      )}
     </div>
   );
 };
@@ -761,6 +759,8 @@ export const GoalsTab = ({
 }) => {
   const [sub, setSub] = useState<string>("Weekly");
   const filtered = state.goals.filter((g) => g.category === sub);
+  const activeGoals = filtered.filter((g) => g.status === "Pending");
+  const historyGoals = filtered.filter((g) => g.status !== "Pending");
   const stakeByCat: Record<string, number> = {
     Weekly: 50,
     Monthly: 100,
@@ -830,7 +830,7 @@ export const GoalsTab = ({
                 marginTop: 2,
               }}
             >
-              {filtered.filter((g) => g.status === "Pending").length} open
+              {activeGoals.length} open
             </div>
           </div>
           <div
@@ -881,7 +881,7 @@ export const GoalsTab = ({
       </Card>
 
       <Card padded={false} style={{ padding: "8px 22px" }}>
-        {filtered.map((g, i) => (
+        {activeGoals.map((g, i) => (
           <div
             key={g.id}
             style={{
@@ -895,10 +895,18 @@ export const GoalsTab = ({
               tasks={state.tasks.filter((t) => t.goalId === g.id)}
               hideStake={g.category === "Side"}
               onAddTask={() => openSheet("addTask", { goalId: g.id })}
+              onDelete={() => {
+                if (
+                  window.confirm(
+                    `Delete "${g.title}"? Its tasks are removed too. This can't be undone.`
+                  )
+                )
+                  dispatch({ type: "DELETE_GOAL", id: g.id });
+              }}
             />
           </div>
         ))}
-        {filtered.length === 0 && (
+        {activeGoals.length === 0 && (
           <div style={{ padding: "32px 0", textAlign: "center" }}>
             <div
               style={{
@@ -941,6 +949,271 @@ export const GoalsTab = ({
           color={sub === "Side" ? "var(--ink)" : "white"}
         />{" "}
         New {sub} Quest
+      </Button>
+
+      {historyGoals.length > 0 && (
+        <div>
+          <Eyebrow style={{ marginBottom: 12, paddingLeft: 4 }}>
+            Quest History · {historyGoals.length}
+          </Eyebrow>
+          <Card padded={false} style={{ padding: "8px 22px" }}>
+            {historyGoals.map((g, i) => (
+              <div
+                key={g.id}
+                style={{
+                  padding: "16px 0",
+                  borderTop:
+                    i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+                }}
+              >
+                <GoalRow
+                  goal={g}
+                  dispatch={dispatch}
+                  tasks={state.tasks.filter((t) => t.goalId === g.id)}
+                  hideStake={g.category === "Side"}
+                  onDelete={() => {
+                    if (
+                      window.confirm(
+                        `Delete "${g.title}"? Its tasks are removed too. This can't be undone.`
+                      )
+                    )
+                      dispatch({ type: "DELETE_GOAL", id: g.id });
+                  }}
+                />
+              </div>
+            ))}
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Hidden page (reached by tapping the home greeting 5×). A stash of quests
+// that are parked — never shown in active lists, never auto-failed — until
+// pushed into a real spot.
+export const FutureQuestsTab = ({
+  state,
+  dispatch,
+  openSheet,
+}: {
+  state: State;
+  dispatch: Dispatch;
+  openSheet: OpenSheet;
+}) => {
+  const spots: Goal["category"][] = [
+    "Weekly",
+    "Monthly",
+    "Quarterly",
+    "Side",
+  ];
+  const colorByCat: Record<string, string> = {
+    Weekly: "var(--accent)",
+    Monthly: "var(--purple)",
+    Quarterly: "var(--magenta)",
+    Side: "var(--teal)",
+  };
+  const quests = [...state.futureGoals].sort((a, b) => a.sort - b.sort);
+
+  return (
+    <div
+      style={{
+        padding: "8px 20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
+      <button
+        onClick={() => dispatch({ type: "TAB", tab: "today" })}
+        style={{
+          alignSelf: "flex-start",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          fontWeight: 700,
+          color: "var(--ink-soft)",
+        }}
+      >
+        <span style={{ fontSize: 14 }}>&larr;</span> Back home
+      </button>
+
+      <Card
+        padded={false}
+        color="var(--ink)"
+        style={{ padding: "16px 20px", color: "white" }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            opacity: 0.8,
+          }}
+        >
+          The Stash · {quests.length}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--body)",
+            fontSize: 13,
+            color: "rgba(255,255,255,0.95)",
+            fontWeight: 500,
+            lineHeight: 1.45,
+            marginTop: 8,
+          }}
+        >
+          Park ideas here. They never count against you and never auto-fail —
+          push one into a spot when you're ready to play it.
+        </div>
+      </Card>
+
+      <Card padded={false} style={{ padding: "8px 22px" }}>
+        {quests.map((g, i) => (
+          <div
+            key={g.id}
+            style={{
+              padding: "16px 0",
+              borderTop: i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 12,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "var(--display)",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: "var(--ink)",
+                  lineHeight: 1.25,
+                }}
+              >
+                {g.title}
+              </div>
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Delete "${g.title}" from the stash? This can't be undone.`
+                    )
+                  )
+                    dispatch({ type: "DELETE_FUTURE_GOAL", id: g.id });
+                }}
+                aria-label="Delete"
+                style={{
+                  flexShrink: 0,
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 4,
+                  color: "var(--ink-soft)",
+                }}
+              >
+                <Icon name="x" size={14} strokeWidth={2.6} color="var(--red)" />
+              </button>
+            </div>
+            {g.stake > 0 && (
+              <div
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--ink-soft)",
+                  marginTop: 4,
+                }}
+              >
+                ${g.stake} stake
+              </div>
+            )}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: 6,
+                marginTop: 12,
+              }}
+            >
+              {spots.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() =>
+                    dispatch({
+                      type: "PUSH_FUTURE_GOAL",
+                      id: g.id,
+                      category: cat,
+                    })
+                  }
+                  style={{
+                    height: 38,
+                    borderRadius: 9,
+                    cursor: "pointer",
+                    background: colorByCat[cat],
+                    color: "white",
+                    border: "2px solid var(--ink)",
+                    boxShadow: "2px 2px 0 var(--ink)",
+                    fontFamily: "var(--body)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {quests.length === 0 && (
+          <div style={{ padding: "32px 0", textAlign: "center" }}>
+            <div
+              style={{
+                fontFamily: "var(--display)",
+                fontSize: 22,
+                fontWeight: 700,
+                color: "var(--ink)",
+                marginBottom: 6,
+              }}
+            >
+              Nothing stashed yet.
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--body)",
+                fontSize: 14,
+                color: "var(--ink-soft)",
+              }}
+            >
+              Ideas you're not ready to commit to. Safe here.
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Button
+        variant="purple"
+        fullWidth
+        size="lg"
+        onClick={() => openSheet("addFutureGoal")}
+      >
+        <Icon name="plus" size={18} strokeWidth={2.6} color="white" /> Stash a
+        future quest
       </Button>
     </div>
   );
@@ -989,11 +1262,35 @@ export const WantsTab = ({
         >
           <Icon name="sparkle" size={16} />
         </div>
-        <div
-          style={{ position: "absolute", top: 30, right: 24, opacity: 0.5 }}
+        <button
+          onClick={() => {
+            if (
+              window.confirm(
+                "Reset urges skipped to 0 and erase want history? This can't be undone."
+              )
+            )
+              dispatch({ type: "RESET_URGES" });
+          }}
+          aria-label="Reset urges skipped and erase history"
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 2,
+            background: "rgba(255,255,255,0.18)",
+            border: "1.5px solid rgba(255,255,255,0.55)",
+            color: "white",
+            borderRadius: 999,
+            padding: "5px 12px",
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            cursor: "pointer",
+          }}
         >
-          <Icon name="sparkle" size={12} />
-        </div>
+          RESET
+        </button>
         <div
           style={{ position: "absolute", bottom: 18, right: 18, opacity: 0.4 }}
         >
@@ -1152,9 +1449,36 @@ export const WantsTab = ({
                     {w.dateLabel}
                   </div>
                 </div>
-                <Pill tone={w.decision === "skip" ? "pass" : "neutral"}>
-                  {w.decision === "skip" ? "SKIPPED ✓" : "BOUGHT"}
-                </Pill>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 10 }}
+                >
+                  <Pill tone={w.decision === "skip" ? "pass" : "neutral"}>
+                    {w.decision === "skip" ? "SKIPPED ✓" : "BOUGHT"}
+                  </Pill>
+                  <button
+                    onClick={() =>
+                      dispatch({ type: "DELETE_WANT", id: w.id })
+                    }
+                    aria-label={`Delete ${w.title}`}
+                    style={{
+                      flexShrink: 0,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 7,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--ink-soft)",
+                      opacity: 0.5,
+                      padding: 0,
+                    }}
+                  >
+                    <Icon name="x" size={13} strokeWidth={2.4} />
+                  </button>
+                </div>
               </div>
             ))}
           </Card>
@@ -1197,14 +1521,37 @@ const WantRow = ({
         <div style={{ fontSize: 15, color: "var(--ink)", fontWeight: 600 }}>
           {want.title}
         </div>
-        {want.price != null && (
-          <Money
-            amount={want.price}
-            size={14}
-            weight={600}
-            color="var(--ink-soft)"
-          />
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {want.price != null && (
+            <Money
+              amount={want.price}
+              size={14}
+              weight={600}
+              color="var(--ink-soft)"
+            />
+          )}
+          <button
+            onClick={() => dispatch({ type: "DELETE_WANT", id: want.id })}
+            aria-label={`Delete ${want.title}`}
+            style={{
+              flexShrink: 0,
+              width: 24,
+              height: 24,
+              borderRadius: 7,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--ink-soft)",
+              opacity: 0.5,
+              padding: 0,
+            }}
+          >
+            <Icon name="x" size={13} strokeWidth={2.4} />
+          </button>
+        </div>
       </div>
       <div style={{ marginBottom: 10 }}>
         <ProgressBar
@@ -1283,6 +1630,7 @@ const WantRow = ({
 // ─────────────────────────────────────────────────────────────
 export const SpendTab = ({
   state,
+  dispatch,
   openSheet,
 }: {
   state: State;
@@ -1323,6 +1671,8 @@ export const SpendTab = ({
         >
           <Eyebrow>Week of {state.currentWeekLabel}</Eyebrow>
           <button
+            onClick={() => openSheet("editBudget")}
+            aria-label="Edit weekly budget"
             style={{
               background: "white",
               border: "2px solid var(--ink)",
@@ -1482,7 +1832,34 @@ export const SpendTab = ({
                   </span>
                 </div>
               </div>
-              <Money amount={tx.amount} size={18} weight={700} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Money amount={tx.amount} size={18} weight={700} />
+                <button
+                  onClick={() =>
+                    dispatch({ type: "DELETE_SPEND", id: tx.id })
+                  }
+                  aria-label={`Delete purchase: ${
+                    tx.note || tx.category || "Purchase"
+                  }`}
+                  style={{
+                    flexShrink: 0,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 7,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--ink-soft)",
+                    opacity: 0.5,
+                    padding: 0,
+                  }}
+                >
+                  <Icon name="x" size={13} strokeWidth={2.4} />
+                </button>
+              </div>
             </div>
           ))}
         </Card>
@@ -1951,7 +2328,7 @@ export const TasksTab = ({
         onClick={() => openSheet("addTask", {})}
       >
         <Icon name="plus" size={18} strokeWidth={2.6} color="var(--ink)" /> Add
-        a step
+        a task
       </Button>
 
       {/* Grouped tasks */}
@@ -2147,8 +2524,13 @@ const TaskRow = ({
         )}
       </button>
       <div style={{ flex: 1, paddingTop: 2 }}>
-        <div
-          style={{
+        <InlineEditText
+          value={task.title}
+          ariaLabel="Edit task"
+          onCommit={(title) =>
+            dispatch({ type: "EDIT_TASK", id: task.id, title })
+          }
+          textStyle={{
             fontFamily: "var(--body)",
             fontSize: 14.5,
             lineHeight: 1.35,
@@ -2157,9 +2539,7 @@ const TaskRow = ({
             textDecoration: task.done ? "line-through" : "none",
             textDecorationThickness: "2px",
           }}
-        >
-          {task.title}
-        </div>
+        />
         {task.minutes != null && (
           <div
             style={{

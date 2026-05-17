@@ -1,9 +1,15 @@
 // Main App for The Pact — gamified (ported from app.jsx; Tweaks design-harness
 // removed, in-memory seed replaced with Supabase-backed store).
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePactStore } from "./state/store";
 import type { Category, State } from "./state/types";
 import { Icon, Eyebrow, Display, Confetti } from "./components/ui";
+import { TrophyReveal } from "./components/TrophyReveal";
+import {
+  TROPHIES,
+  evaluateTrophies,
+  type Trophy,
+} from "./lib/trophies";
 import {
   TodayTab,
   GoalsTab,
@@ -11,12 +17,15 @@ import {
   WantsTab,
   SpendTab,
   PactTab,
+  FutureQuestsTab,
 } from "./tabs";
 import {
   AddWantSheet,
   AddGoalSheet,
   AddTaskSheet,
+  AddFutureGoalSheet,
   LogSpendSheet,
+  EditBudgetSheet,
   LogPaymentSheet,
   LockInOverlay,
 } from "./modals";
@@ -24,6 +33,111 @@ import {
 export default function App() {
   const [state, dispatch] = usePactStore();
   const [now, setNow] = useState(Date.now());
+
+  // Notification preference. Device/browser-specific (tied to the OS-level
+  // permission), so it lives in localStorage rather than the synced store.
+  // Stored "on" only counts if the browser permission is still granted —
+  // so revoking it in browser settings reconciles back to off on next load.
+  const [notifOn, setNotifOn] = useState<boolean>(() => {
+    try {
+      if (localStorage.getItem("pact:notifications") !== "on") return false;
+      return (
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleNotifications = async () => {
+    const setPref = (on: boolean) => {
+      setNotifOn(on);
+      try {
+        localStorage.setItem("pact:notifications", on ? "on" : "off");
+      } catch {
+        /* storage unavailable — keep the in-memory toggle only */
+      }
+    };
+
+    if (notifOn) {
+      setPref(false);
+      return;
+    }
+    if (typeof Notification === "undefined") return;
+
+    let perm = Notification.permission;
+    if (perm === "default") {
+      try {
+        perm = await Notification.requestPermission();
+      } catch {
+        perm = Notification.permission;
+      }
+    }
+    if (perm === "granted") {
+      setPref(true);
+      try {
+        new Notification("The Pact", {
+          body: "Notifications are on — we'll nudge you about your pact.",
+        });
+      } catch {
+        /* some browsers block construction outside a SW; toggle still on */
+      }
+    } else {
+      // Denied/blocked: can't enable programmatically, stay off.
+      setPref(false);
+    }
+  };
+
+  // Easter egg: 5 taps on the home greeting opens the hidden Future Quests
+  // page. Taps must be in quick succession (the counter resets after a pause).
+  const tapCount = useRef(0);
+  const tapTimer = useRef<number | undefined>(undefined);
+  const onTitleTap = () => {
+    if (state.tab !== "today") return;
+    window.clearTimeout(tapTimer.current);
+    tapCount.current += 1;
+    if (tapCount.current >= 5) {
+      tapCount.current = 0;
+      dispatch({ type: "TAB", tab: "future" });
+      return;
+    }
+    tapTimer.current = window.setTimeout(() => {
+      tapCount.current = 0;
+    }, 1500);
+  };
+
+  // Auto-award trophies as criteria are met, persist them, and queue a
+  // reveal for any unlocked *after* the first load — so a backlog from a
+  // fresh/legacy badge list is backfilled silently, not as 8 animations.
+  const trophySeeded = useRef(false);
+  const [revealQueue, setRevealQueue] = useState<Trophy[]>([]);
+  useEffect(() => {
+    if (state.loading) return;
+    const met = evaluateTrophies(state);
+    const newly = met.filter((id) => !state.badges.includes(id));
+    if (newly.length) {
+      dispatch({ type: "AWARD_BADGES", ids: newly });
+      if (trophySeeded.current) {
+        const ts = newly
+          .map((id) => TROPHIES.find((t) => t.id === id))
+          .filter((t): t is Trophy => !!t);
+        if (ts.length) setRevealQueue((q) => [...q, ...ts]);
+      }
+    }
+    trophySeeded.current = true;
+  }, [
+    state.loading,
+    state.streak,
+    state.saved,
+    state.urgesSkipped,
+    state.wants,
+    state.goals,
+    state.spending,
+    state.currentWeek,
+    state.badges,
+    dispatch,
+  ]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000);
@@ -65,15 +179,40 @@ export default function App() {
       <SpendTab state={state} dispatch={dispatch} openSheet={openSheet} />
     ),
     pact: <PactTab state={state} dispatch={dispatch} openSheet={openSheet} />,
+    future: (
+      <FutureQuestsTab
+        state={state}
+        dispatch={dispatch}
+        openSheet={openSheet}
+      />
+    ),
   };
 
+  // Live date for the header eyebrows (re-derived from `now`, which ticks
+  // every 30s, so it stays correct across midnight).
+  const dateLabel = new Date(now)
+    .toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    })
+    .toUpperCase()
+    .replace(", ", " · ");
+  const streakLabel = `${state.streak} ${
+    state.streak === 1 ? "WEEK" : "WEEKS"
+  } 🔥`;
+
   const tabTitle: Record<string, { eyebrow: string; title: string }> = {
-    today: { eyebrow: "TUE · MAY 5 · 6 WEEKS 🔥", title: "Hi, Maribett." },
+    today: {
+      eyebrow: `${dateLabel} · ${streakLabel}`,
+      title: "Hi, Maribett.",
+    },
     goals: { eyebrow: "ACTIVE QUESTS", title: "Quests" },
     tasks: { eyebrow: "THE NEXT STEPS", title: "Tasks" },
     wants: { eyebrow: "THE FRICTION LAYER", title: "Want List" },
-    spend: { eyebrow: "RESETS MONDAY", title: "Spending" },
+    spend: { eyebrow: `${dateLabel} · RESETS MON`, title: "Spending" },
     pact: { eyebrow: "WITH JUSTIN WAI", title: "The Pact" },
+    future: { eyebrow: "HIDDEN · THE STASH", title: "Future Quests" },
   };
 
   return (
@@ -107,28 +246,50 @@ export default function App() {
             <Eyebrow style={{ color: "var(--accent)", fontWeight: 700 }}>
               {tabTitle[state.tab].eyebrow}
             </Eyebrow>
-            <div style={{ marginTop: 6 }}>
+            <div
+              style={{
+                marginTop: 6,
+                userSelect: "none",
+                WebkitUserSelect: "none",
+              }}
+              onClick={onTitleTap}
+            >
               <Display size={36} weight={700}>
                 {tabTitle[state.tab].title}
               </Display>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <div
+            <button
+              onClick={toggleNotifications}
+              aria-pressed={notifOn}
+              aria-label={
+                notifOn ? "Turn notifications off" : "Turn notifications on"
+              }
+              title={
+                notifOn ? "Notifications on" : "Notifications off"
+              }
               style={{
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: "white",
+                background: notifOn ? "var(--accent)" : "white",
                 border: "2px solid var(--ink)",
                 boxShadow: "2px 2px 0 var(--ink)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                cursor: "pointer",
+                padding: 0,
               }}
             >
-              <Icon name="bell" size={16} color="var(--ink)" strokeWidth={2.4} />
-            </div>
+              <Icon
+                name={notifOn ? "bell" : "bellOff"}
+                size={16}
+                color={notifOn ? "white" : "var(--ink)"}
+                strokeWidth={2.4}
+              />
+            </button>
             <div
               style={{
                 width: 42,
@@ -283,10 +444,21 @@ export default function App() {
         goals={state.goals}
         defaultGoalId={state.sheetData.goalId}
       />
+      <AddFutureGoalSheet
+        open={state.sheet === "addFutureGoal"}
+        onClose={closeSheet}
+        dispatch={dispatch}
+      />
       <LogSpendSheet
         open={state.sheet === "logSpend"}
         onClose={closeSheet}
         dispatch={dispatch}
+      />
+      <EditBudgetSheet
+        open={state.sheet === "editBudget"}
+        onClose={closeSheet}
+        dispatch={dispatch}
+        current={state.weeklyBudget}
       />
       <LogPaymentSheet
         open={state.sheet === "logPayment"}
@@ -302,6 +474,11 @@ export default function App() {
       />
 
       <Confetti trigger={state.confettiKey} />
+
+      <TrophyReveal
+        trophy={revealQueue[0] ?? null}
+        onDone={() => setRevealQueue((q) => q.slice(1))}
+      />
     </div>
   );
 }

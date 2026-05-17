@@ -1,4 +1,4 @@
-import type { State, Action } from "./types";
+import type { State, Action, Goal } from "./types";
 import { computeRelative, currentWeek } from "../lib/helpers";
 
 export const emptyState = (): State => {
@@ -14,10 +14,14 @@ export const emptyState = (): State => {
     lastLockedStakes: 0,
     badges: [],
     goals: [],
+    futureGoals: [],
     tasks: [],
     wants: [],
     spending: [],
     payments: [],
+    lastWeekKey: null,
+    lastMonthKey: null,
+    lastQuarterKey: null,
     sheet: null,
     sheetData: {},
     lockInOpen: false,
@@ -40,9 +44,13 @@ export function reducer(state: State, action: Action): State {
       return { ...state, sheet: action.sheet, sheetData: action.data || {} };
     case "CLOSE_SHEET":
       return { ...state, sheet: null };
-    case "PASS_GOAL":
+    case "PASS_GOAL": {
+      // Passing a quest means its stake never reaches the anti-charity, so
+      // credit it to the home "Saved from anti-charity" total immediately.
+      const passed = state.goals.find((g) => g.id === action.id);
       return {
         ...state,
+        saved: state.saved + Number(passed?.stake ?? 0),
         goals: state.goals.map((g) =>
           g.id === action.id
             ? { ...g, status: "Pass", relative: "passed today" }
@@ -50,6 +58,7 @@ export function reducer(state: State, action: Action): State {
         ),
         confettiKey: state.confettiKey + 1,
       };
+    }
     case "FAIL_GOAL":
       return {
         ...state,
@@ -57,15 +66,22 @@ export function reducer(state: State, action: Action): State {
           g.id === action.id ? { ...g, status: "Fail" } : g
         ),
       };
-    case "RESET_GOAL":
+    case "RESET_GOAL": {
+      // Undoing a pass returns the stake to "at risk", so reverse the credit
+      // PASS_GOAL applied. Clamp at 0 to stay safe for goals that were already
+      // "Pass" before per-pass crediting existed.
+      const reset = state.goals.find((g) => g.id === action.id);
+      const refund = reset?.status === "Pass" ? Number(reset.stake) : 0;
       return {
         ...state,
+        saved: Math.max(0, state.saved - refund),
         goals: state.goals.map((g) =>
           g.id === action.id
             ? { ...g, status: "Pending", relative: computeRelative(g.category) }
             : g
         ),
       };
+    }
     case "OPEN_LOCKIN": {
       const weeklyStakes = state.goals
         .filter((g) => g.category === "Weekly" && g.status === "Pass")
@@ -73,12 +89,13 @@ export function reducer(state: State, action: Action): State {
       return { ...state, lockInOpen: true, lastLockedStakes: weeklyStakes };
     }
     case "CLOSE_LOCKIN": {
-      const weeklyStakes = state.lastLockedStakes;
+      // Stakes are now credited to `saved` per pass (PASS_GOAL), so the weekly
+      // ritual no longer adds them again — it just advances the streak and
+      // rolls Weekly quests over for the new week.
       return {
         ...state,
         lockInOpen: false,
         streak: state.streak + 1,
-        saved: state.saved + weeklyStakes,
         goals: state.goals.map((g) =>
           g.category === "Weekly"
             ? { ...g, status: "Pending", relative: "due Sun" }
@@ -116,6 +133,31 @@ export function reducer(state: State, action: Action): State {
             : state.confettiKey,
       };
     }
+    case "DELETE_WANT":
+      return {
+        ...state,
+        wants: state.wants.filter((w) => w.id !== action.id),
+      };
+    case "DELETE_SPEND":
+      return {
+        ...state,
+        spending: state.spending.filter((s) => s.id !== action.id),
+      };
+    case "RESET_URGES":
+      // Erase decided history and zero the lifetime skip counter so the
+      // "Urges skipped" total (urgesSkipped + decided skips) reads 0.
+      return {
+        ...state,
+        wants: state.wants.filter((w) => !w.decision),
+        urgesSkipped: 0,
+      };
+    case "AWARD_BADGES":
+      return {
+        ...state,
+        badges: Array.from(new Set([...state.badges, ...action.ids])),
+      };
+    case "SET_BUDGET":
+      return { ...state, weeklyBudget: action.amount };
     case "ADD_GOAL": {
       const g = {
         id: "g" + Date.now(),
@@ -127,9 +169,48 @@ export function reducer(state: State, action: Action): State {
         paid: false,
         sort:
           Math.max(0, ...state.goals.map((x) => x.sort)) + 1,
+        future: false,
       };
       return { ...state, goals: [...state.goals, g] };
     }
+    case "ADD_FUTURE_GOAL": {
+      // Parked: no real spot yet (placeholder category, chosen on push),
+      // and excluded from auto-fail until then.
+      const g = {
+        id: "g" + Date.now(),
+        title: action.title,
+        category: "Side" as const,
+        stake: action.stake,
+        status: "Pending" as const,
+        relative: "",
+        paid: false,
+        sort: Math.max(0, ...state.futureGoals.map((x) => x.sort)) + 1,
+        future: true,
+      };
+      return { ...state, futureGoals: [...state.futureGoals, g] };
+    }
+    case "PUSH_FUTURE_GOAL": {
+      const g = state.futureGoals.find((x) => x.id === action.id);
+      if (!g) return state;
+      const promoted: Goal = {
+        ...g,
+        category: action.category,
+        status: "Pending",
+        relative: computeRelative(action.category),
+        future: false,
+        sort: Math.max(0, ...state.goals.map((x) => x.sort)) + 1,
+      };
+      return {
+        ...state,
+        futureGoals: state.futureGoals.filter((x) => x.id !== action.id),
+        goals: [...state.goals, promoted],
+      };
+    }
+    case "DELETE_FUTURE_GOAL":
+      return {
+        ...state,
+        futureGoals: state.futureGoals.filter((g) => g.id !== action.id),
+      };
     case "LOG_SPEND": {
       const s = {
         id: "s" + Date.now(),
@@ -159,10 +240,32 @@ export function reducer(state: State, action: Action): State {
           t.id === action.id ? { ...t, done: !t.done } : t
         ),
       };
+    case "EDIT_TASK":
+      return {
+        ...state,
+        tasks: state.tasks.map((t) =>
+          t.id === action.id ? { ...t, title: action.title } : t
+        ),
+      };
+    case "EDIT_GOAL":
+      return {
+        ...state,
+        goals: state.goals.map((g) =>
+          g.id === action.id ? { ...g, title: action.title } : g
+        ),
+      };
     case "DELETE_TASK":
       return {
         ...state,
         tasks: state.tasks.filter((t) => t.id !== action.id),
+      };
+    case "DELETE_GOAL":
+      // Mirror the DB's ON DELETE CASCADE so optimistic state stays
+      // consistent before the refetch reconciles.
+      return {
+        ...state,
+        goals: state.goals.filter((g) => g.id !== action.id),
+        tasks: state.tasks.filter((t) => t.goalId !== action.id),
       };
     case "LOG_PAYMENT": {
       let remaining = action.amount;

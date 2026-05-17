@@ -183,6 +183,70 @@ export const AddGoalSheet = ({
   );
 };
 
+export const AddFutureGoalSheet = ({
+  open,
+  onClose,
+  dispatch,
+}: {
+  open: boolean;
+  onClose: () => void;
+  dispatch: Dispatch;
+}) => {
+  const [title, setTitle] = useState("");
+  const [stake, setStake] = useState(50);
+  useEffect(() => {
+    if (open) {
+      setTitle("");
+      setStake(50);
+    }
+  }, [open]);
+  const submit = () => {
+    if (!title.trim()) return;
+    dispatch({ type: "ADD_FUTURE_GOAL", title: title.trim(), stake });
+    onClose();
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Stash a quest 🗄️">
+      <div
+        style={{
+          fontFamily: "var(--body)",
+          fontSize: 14,
+          color: "var(--ink-soft)",
+          marginBottom: 22,
+          lineHeight: 1.5,
+          fontWeight: 500,
+        }}
+      >
+        Parked and safe — no deadline, no auto-fail. Pick its spot later.
+      </div>
+      <Field label="Quest">
+        <Input
+          value={title}
+          onChange={setTitle}
+          placeholder="e.g. Open a brokerage account"
+        />
+      </Field>
+      <Field label="Stake">
+        <Input
+          value={stake}
+          onChange={(v) => setStake(Number(v) || 0)}
+          prefix="$"
+          inputMode="decimal"
+        />
+      </Field>
+      <Button
+        variant="purple"
+        fullWidth
+        size="lg"
+        onClick={submit}
+        style={{ marginTop: 8 }}
+      >
+        Stash it
+      </Button>
+    </Sheet>
+  );
+};
+
 export const LogSpendSheet = ({
   open,
   onClose,
@@ -272,6 +336,51 @@ export const LogSpendSheet = ({
         style={{ marginTop: 8 }}
       >
         Log it
+      </Button>
+    </Sheet>
+  );
+};
+
+export const EditBudgetSheet = ({
+  open,
+  onClose,
+  dispatch,
+  current,
+}: {
+  open: boolean;
+  onClose: () => void;
+  dispatch: Dispatch;
+  current: number;
+}) => {
+  const [amount, setAmount] = useState(String(current));
+  useEffect(() => {
+    if (open) setAmount(String(current));
+  }, [open, current]);
+  const submit = () => {
+    const n = Number(amount);
+    if (!amount || !Number.isFinite(n) || n <= 0) return;
+    dispatch({ type: "SET_BUDGET", amount: n });
+    onClose();
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Weekly budget">
+      <Field label="How much can you spend each week?">
+        <Input
+          value={amount}
+          onChange={setAmount}
+          prefix="$"
+          inputMode="decimal"
+          placeholder="125"
+        />
+      </Field>
+      <Button
+        variant="primary"
+        fullWidth
+        size="lg"
+        onClick={submit}
+        style={{ marginTop: 8 }}
+      >
+        Save budget
       </Button>
     </Sheet>
   );
