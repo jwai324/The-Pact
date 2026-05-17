@@ -113,4 +113,6 @@ export type Action =
   | { type: "RESET_URGES" }
   | { type: "AWARD_BADGES"; ids: string[] }
   | { type: "SET_BUDGET"; amount: number }
+  | { type: "SET_STREAK"; value: number }
+  | { type: "SET_SAVED"; value: number }
   | { type: "LOG_PAYMENT"; amount: number; note: string; proofUrl: string };
