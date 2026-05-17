@@ -43,8 +43,8 @@ export const TodayTab = ({
     .reduce((a, b) => a + Number(b.stake), 0);
   const { lvl, next } = getLevel(state.streak);
 
-  const earnedCount = TROPHIES.filter((t) =>
-    state.badges.includes(t.id)
+  const earnedCount = TROPHIES.filter(
+    (t) => (state.badges[t.id] ?? 0) > 0
   ).length;
   const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
 
@@ -423,13 +423,18 @@ export const TodayTab = ({
           }}
         >
           {TROPHIES.map((t) => {
-            const earned = state.badges.includes(t.id);
+            const count = state.badges[t.id] ?? 0;
+            const earned = count > 0;
             return (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => setOpenTrophy(t)}
-                aria-label={`${t.name}${earned ? " (earned)" : " — how to earn"}`}
+                aria-label={`${t.name}${
+                  earned
+                    ? ` (earned${count > 1 ? ` ${count} times` : ""})`
+                    : " — how to earn"
+                }`}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -447,6 +452,7 @@ export const TodayTab = ({
                 <div
                   id={`trophy-slot-${t.id}`}
                   style={{
+                    position: "relative",
                     width: 48,
                     height: 48,
                     borderRadius: 14,
@@ -458,6 +464,31 @@ export const TodayTab = ({
                     justifyContent: "center",
                   }}
                 >
+                  {count > 1 && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: -7,
+                        right: -7,
+                        minWidth: 18,
+                        height: 18,
+                        padding: "0 4px",
+                        borderRadius: 9,
+                        background: "var(--ink)",
+                        color: "white",
+                        border: "2px solid white",
+                        fontFamily: "var(--mono)",
+                        fontSize: 9,
+                        fontWeight: 700,
+                        lineHeight: "14px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      ×{count}
+                    </span>
+                  )}
                   <Icon
                     name={t.icon}
                     size={22}
@@ -489,7 +520,7 @@ export const TodayTab = ({
         title={
           openTrophy
             ? `${openTrophy.name} ${
-                state.badges.includes(openTrophy.id) ? "🏆" : "🔒"
+                (state.badges[openTrophy.id] ?? 0) > 0 ? "🏆" : "🔒"
               }`
             : ""
         }
@@ -525,7 +556,9 @@ export const TodayTab = ({
               </div>
             </div>
             <Eyebrow>
-              {state.badges.includes(openTrophy.id)
+              {(state.badges[openTrophy.id] ?? 0) > 1
+                ? `Earned ×${state.badges[openTrophy.id]}`
+                : (state.badges[openTrophy.id] ?? 0) > 0
                 ? "Earned"
                 : "How to earn it"}
             </Eyebrow>

@@ -59,7 +59,13 @@ export interface DataSlice {
   urgesSkipped: number;
   weeklyBudget: number;
   lastLockedStakes: number;
-  badges: string[];
+  // Trophy id -> number of times earned (cumulative; re-earnable). Display
+  // only; never reflects current criteria once a count is recorded.
+  badges: Record<string, number>;
+  // Trophy ids whose criteria are currently met, as of the last evaluation.
+  // Persisted so a not-met -> met transition (a fresh earn) can be detected
+  // across reloads without re-counting every refresh.
+  activeTrophies: string[];
   goals: Goal[];
   futureGoals: Goal[];
   tasks: Task[];
@@ -111,7 +117,7 @@ export type Action =
   | { type: "DELETE_WANT"; id: string }
   | { type: "DELETE_SPEND"; id: string }
   | { type: "RESET_URGES" }
-  | { type: "AWARD_BADGES"; ids: string[] }
+  | { type: "AWARD_BADGES"; ids: string[]; active: string[] }
   | { type: "SET_BUDGET"; amount: number }
   | { type: "SET_STREAK"; value: number }
   | { type: "SET_SAVED"; value: number }
