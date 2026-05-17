@@ -36,6 +36,28 @@ export default function App() {
   const [state, dispatch] = usePactStore();
   const [now, setNow] = useState(Date.now());
 
+  // Browser notification permission lives in the browser, not the synced
+  // store — it is per-device and can't be re-prompted once decided.
+  const [notifPerm, setNotifPerm] = useState<
+    NotificationPermission | "unsupported"
+  >(() =>
+    typeof window !== "undefined" && "Notification" in window
+      ? Notification.permission
+      : "unsupported"
+  );
+  const toggleNotifications = async () => {
+    if (notifPerm === "unsupported") return;
+    // Resolves immediately to the current state if already granted/denied;
+    // only shows the browser prompt while permission is still "default".
+    const result = await Notification.requestPermission();
+    setNotifPerm(result);
+    if (result === "granted") {
+      new Notification("The Pact", {
+        body: "Notifications enabled — you're all set. 🔔",
+      });
+    }
+  };
+
   // Easter egg: 5 taps on the home greeting opens the hidden Future Quests
   // page. Taps must be in quick succession (the counter resets after a pause).
   const tapCount = useRef(0);
@@ -212,21 +234,41 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <div
+            <button
+              type="button"
+              onClick={toggleNotifications}
+              aria-label={
+                notifPerm === "granted"
+                  ? "Browser notifications enabled"
+                  : "Enable browser notifications"
+              }
+              title={
+                notifPerm === "granted"
+                  ? "Notifications enabled"
+                  : notifPerm === "denied"
+                  ? "Notifications blocked — enable them in your browser settings"
+                  : notifPerm === "unsupported"
+                  ? "Notifications not supported in this browser"
+                  : "Enable notifications"
+              }
               style={{
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: "white",
+                background:
+                  notifPerm === "granted" ? "var(--lime)" : "white",
                 border: "2px solid var(--ink)",
                 boxShadow: "2px 2px 0 var(--ink)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                padding: 0,
+                cursor:
+                  notifPerm === "unsupported" ? "default" : "pointer",
               }}
             >
               <Icon name="bell" size={16} color="var(--ink)" strokeWidth={2.4} />
-            </div>
+            </button>
             <div
               style={{
                 width: 42,
