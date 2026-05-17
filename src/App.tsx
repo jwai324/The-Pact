@@ -45,17 +45,40 @@ export default function App() {
       ? Notification.permission
       : "unsupported"
   );
-  const toggleNotifications = async () => {
-    if (notifPerm === "unsupported") return;
-    // Resolves immediately to the current state if already granted/denied;
-    // only shows the browser prompt while permission is still "default".
-    const result = await Notification.requestPermission();
-    setNotifPerm(result);
-    if (result === "granted") {
-      new Notification("The Pact", {
-        body: "Notifications enabled — you're all set. 🔔",
-      });
+  // App-level on/off switch layered over the browser permission, which the
+  // Notifications API won't let us revoke programmatically. Turning it off
+  // mutes notifications while leaving the granted permission untouched.
+  // Persisted per device since, like the permission, it isn't synced state.
+  const [notifEnabled, setNotifEnabled] = useState<boolean>(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("thepact:notifEnabled") !== "false"
+  );
+  const notifOn = notifPerm === "granted" && notifEnabled;
+  const setNotifPref = (on: boolean) => {
+    setNotifEnabled(on);
+    try {
+      window.localStorage.setItem("thepact:notifEnabled", String(on));
+    } catch {
+      // Storage disabled (e.g. private mode) — in-memory state still applies.
     }
+  };
+  const toggleNotifications = async () => {
+    if (notifPerm === "unsupported" || notifPerm === "denied") return;
+    if (notifOn) {
+      setNotifPref(false);
+      return;
+    }
+    if (notifPerm !== "granted") {
+      // Resolves immediately if already decided; only prompts while "default".
+      const result = await Notification.requestPermission();
+      setNotifPerm(result);
+      if (result !== "granted") return;
+    }
+    setNotifPref(true);
+    new Notification("The Pact", {
+      body: "Notifications enabled — you're all set. 🔔",
+    });
   };
 
   // Easter egg: 5 taps on the home greeting opens the hidden Future Quests
@@ -238,25 +261,25 @@ export default function App() {
               type="button"
               onClick={toggleNotifications}
               aria-label={
-                notifPerm === "granted"
-                  ? "Browser notifications enabled"
-                  : "Enable browser notifications"
+                notifOn
+                  ? "Turn off notifications"
+                  : "Turn on notifications"
               }
+              aria-pressed={notifOn}
               title={
-                notifPerm === "granted"
-                  ? "Notifications enabled"
+                notifOn
+                  ? "Notifications on — tap to turn off"
                   : notifPerm === "denied"
                   ? "Notifications blocked — enable them in your browser settings"
                   : notifPerm === "unsupported"
                   ? "Notifications not supported in this browser"
-                  : "Enable notifications"
+                  : "Tap to turn on notifications"
               }
               style={{
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background:
-                  notifPerm === "granted" ? "var(--lime)" : "white",
+                background: notifOn ? "var(--lime)" : "white",
                 border: "2px solid var(--ink)",
                 boxShadow: "2px 2px 0 var(--ink)",
                 display: "flex",
@@ -264,7 +287,9 @@ export default function App() {
                 justifyContent: "center",
                 padding: 0,
                 cursor:
-                  notifPerm === "unsupported" ? "default" : "pointer",
+                  notifPerm === "unsupported" || notifPerm === "denied"
+                    ? "default"
+                    : "pointer",
               }}
             >
               <Icon name="bell" size={16} color="var(--ink)" strokeWidth={2.4} />
