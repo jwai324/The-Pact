@@ -54,18 +54,23 @@ export default function App() {
     }, 1500);
   };
 
-  // Auto-award trophies as criteria are met, persist them, and queue a
-  // reveal for any unlocked *after* the first load — so a backlog from a
-  // fresh/legacy badge list is backfilled silently, not as 8 animations.
+  // Trophies are re-earnable: each not-met -> met transition bumps a lifetime
+  // count. `activeTrophies` is the currently-met set from the last pass; a
+  // trophy missing from it but met now is a fresh earn. We also resync when a
+  // trophy lapses (met -> not-met) so it can be counted again later. Reveals
+  // only fire post-seed, so a legacy backlog backfills silently.
   const trophySeeded = useRef(false);
   const [revealQueue, setRevealQueue] = useState<Trophy[]>([]);
   useEffect(() => {
     if (state.loading) return;
     const met = evaluateTrophies(state);
-    const newly = met.filter((id) => !state.badges.includes(id));
-    if (newly.length) {
-      dispatch({ type: "AWARD_BADGES", ids: newly });
-      if (trophySeeded.current) {
+    const active = state.activeTrophies;
+    const newly = met.filter((id) => !active.includes(id));
+    const changed =
+      newly.length > 0 || active.some((id) => !met.includes(id));
+    if (changed) {
+      dispatch({ type: "AWARD_BADGES", ids: newly, active: met });
+      if (trophySeeded.current && newly.length) {
         const ts = newly
           .map((id) => TROPHIES.find((t) => t.id === id))
           .filter((t): t is Trophy => !!t);
@@ -82,7 +87,7 @@ export default function App() {
     state.goals,
     state.spending,
     state.currentWeek,
-    state.badges,
+    state.activeTrophies,
     dispatch,
   ]);
 

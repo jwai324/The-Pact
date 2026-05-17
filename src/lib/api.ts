@@ -115,13 +115,33 @@ export async function fetchAll(): Promise<DataSlice> {
     proofUrl: p.proof_url ?? null,
   }));
 
+  // `badges` jsonb holds { counts, active }. Legacy rows store a bare array of
+  // earned ids (incl. the display-name seed, which never matched a trophy id
+  // and stays inert): map each to one earning and treat them as still active
+  // so the first post-deploy evaluation doesn't re-count held trophies.
+  const rawBadges = a?.badges as unknown;
+  let badges: Record<string, number> = {};
+  let activeTrophies: string[] = [];
+  if (Array.isArray(rawBadges)) {
+    for (const id of rawBadges as string[]) badges[id] = 1;
+    activeTrophies = [...(rawBadges as string[])];
+  } else if (rawBadges && typeof rawBadges === "object") {
+    const o = rawBadges as {
+      counts?: Record<string, number>;
+      active?: string[];
+    };
+    badges = o.counts ?? {};
+    activeTrophies = o.active ?? [];
+  }
+
   return {
     streak: a?.streak ?? 0,
     saved: a ? Number(a.saved) : 0,
     urgesSkipped: a?.urges_skipped ?? 0,
     weeklyBudget: a ? Number(a.weekly_budget) : 125,
     lastLockedStakes: a ? Number(a.last_locked_stakes) : 0,
-    badges: (a?.badges as string[]) ?? [],
+    badges,
+    activeTrophies,
     goals,
     futureGoals,
     tasks,
@@ -404,12 +424,12 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         return true;
       }
       case "AWARD_BADGES": {
-        const merged = Array.from(
-          new Set([...prev.badges, ...action.ids])
-        );
+        const counts: Record<string, number> = { ...prev.badges };
+        for (const id of action.ids)
+          counts[id] = (counts[id] ?? 0) + 1;
         await supabase
           .from("app_state")
-          .update({ badges: merged })
+          .update({ badges: { counts, active: action.active } })
           .eq("id", 1);
         return true;
       }

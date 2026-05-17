@@ -12,7 +12,8 @@ export const emptyState = (): State => {
     currentWeek: weekKey,
     currentWeekLabel: weekLabel,
     lastLockedStakes: 0,
-    badges: [],
+    badges: {},
+    activeTrophies: [],
     goals: [],
     futureGoals: [],
     tasks: [],
@@ -151,11 +152,14 @@ export function reducer(state: State, action: Action): State {
         wants: state.wants.filter((w) => !w.decision),
         urgesSkipped: 0,
       };
-    case "AWARD_BADGES":
-      return {
-        ...state,
-        badges: Array.from(new Set([...state.badges, ...action.ids])),
-      };
+    case "AWARD_BADGES": {
+      // ids = trophies that just transitioned not-met -> met (each bumps its
+      // lifetime count). active = the full currently-met set, stored so the
+      // next evaluation can tell a fresh earn from a still-held one.
+      const badges = { ...state.badges };
+      for (const id of action.ids) badges[id] = (badges[id] ?? 0) + 1;
+      return { ...state, badges, activeTrophies: action.active };
+    }
     case "SET_BUDGET":
       return { ...state, weeklyBudget: action.amount };
     case "SET_STREAK":
