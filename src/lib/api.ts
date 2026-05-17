@@ -419,6 +419,18 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .update({ weekly_budget: action.amount })
           .eq("id", 1);
         return true;
+      case "SET_STREAK":
+        await supabase
+          .from("app_state")
+          .update({ streak: action.value })
+          .eq("id", 1);
+        return true;
+      case "SET_SAVED":
+        await supabase
+          .from("app_state")
+          .update({ saved: action.value })
+          .eq("id", 1);
+        return true;
       default:
         return false; // TAB / OPEN_SHEET / CLOSE_SHEET / HYDRATE — UI only
     }

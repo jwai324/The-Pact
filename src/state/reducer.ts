@@ -158,6 +158,10 @@ export function reducer(state: State, action: Action): State {
       };
     case "SET_BUDGET":
       return { ...state, weeklyBudget: action.amount };
+    case "SET_STREAK":
+      return { ...state, streak: action.value };
+    case "SET_SAVED":
+      return { ...state, saved: action.value };
     case "ADD_GOAL": {
       const g = {
         id: "g" + Date.now(),
