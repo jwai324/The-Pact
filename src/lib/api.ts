@@ -433,6 +433,26 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .eq("id", 1);
         return true;
       }
+      case "ADD_BADGE": {
+        const counts: Record<string, number> = { ...prev.badges };
+        counts[action.id] = (counts[action.id] ?? 0) + 1;
+        await supabase
+          .from("app_state")
+          .update({ badges: { counts, active: prev.activeTrophies } })
+          .eq("id", 1);
+        return true;
+      }
+      case "REMOVE_BADGE": {
+        const counts: Record<string, number> = { ...prev.badges };
+        const next = (counts[action.id] ?? 0) - 1;
+        if (next > 0) counts[action.id] = next;
+        else delete counts[action.id];
+        await supabase
+          .from("app_state")
+          .update({ badges: { counts, active: prev.activeTrophies } })
+          .eq("id", 1);
+        return true;
+      }
       case "SET_BUDGET":
         await supabase
           .from("app_state")
