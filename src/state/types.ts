@@ -18,7 +18,7 @@ export interface Goal {
 
 export interface Task {
   id: string;
-  goalId: string;
+  goalId: string | null;
   title: string;
   minutes: number | null;
   done: boolean;
@@ -108,7 +108,12 @@ export type Action =
   | { type: "PUSH_FUTURE_GOAL"; id: string; category: Category }
   | { type: "DELETE_FUTURE_GOAL"; id: string }
   | { type: "LOG_SPEND"; amount: number; note: string; category: string }
-  | { type: "ADD_TASK"; goalId: string; title: string; minutes: number | null }
+  | {
+      type: "ADD_TASK";
+      goalId: string | null;
+      title: string;
+      minutes: number | null;
+    }
   | { type: "TOGGLE_TASK"; id: string }
   | { type: "EDIT_TASK"; id: string; title: string }
   | { type: "EDIT_GOAL"; id: string; title: string }

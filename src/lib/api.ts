@@ -366,7 +366,7 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
       case "ADD_TASK": {
         const nextSort = Math.max(0, ...prev.tasks.map((t) => t.sort)) + 1;
         await supabase.from("tasks").insert({
-          goal_id: action.goalId,
+          goal_id: action.goalId || null,
           title: action.title,
           minutes: action.minutes,
           done: false,

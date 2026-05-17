@@ -2450,6 +2450,11 @@ export const TasksTab = ({
     }))
     .filter((group) => group.tasks.length > 0);
 
+  // Tasks not tied to any quest. They have no category, so they only show
+  // under "All".
+  const standaloneTasks =
+    filter === "All" ? state.tasks.filter((t) => !t.goalId) : [];
+
   return (
     <div
       style={{
@@ -2555,7 +2560,7 @@ export const TasksTab = ({
       </Button>
 
       {/* Grouped tasks */}
-      {groupedGoals.length === 0 && (
+      {groupedGoals.length === 0 && standaloneTasks.length === 0 && (
         <Card
           padded={false}
           style={{ padding: "32px 20px", textAlign: "center" }}
@@ -2698,6 +2703,66 @@ export const TasksTab = ({
           </Card>
         );
       })}
+
+      {standaloneTasks.length > 0 && (
+        <Card padded={false} style={{ padding: 0, overflow: "hidden" }}>
+          <div
+            style={{
+              background: "var(--ink)",
+              padding: "12px 18px",
+              color: "white",
+              borderBottom: "2px solid var(--ink)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 9.5,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                fontWeight: 700,
+                opacity: 0.85,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Icon name="list" size={11} strokeWidth={2.4} />
+              Standalone · no quest
+            </div>
+            <div
+              style={{
+                background: "white",
+                color: "var(--ink)",
+                border: "2px solid var(--ink)",
+                borderRadius: 999,
+                padding: "3px 10px",
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                fontWeight: 800,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {standaloneTasks.filter((t) => t.done).length}/
+              {standaloneTasks.length}
+            </div>
+          </div>
+          <div style={{ padding: "4px 18px" }}>
+            {standaloneTasks.map((t, i) => (
+              <TaskRow
+                key={t.id}
+                task={t}
+                dispatch={dispatch}
+                first={i === 0}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
