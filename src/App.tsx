@@ -26,6 +26,8 @@ import {
   AddFutureGoalSheet,
   LogSpendSheet,
   EditBudgetSheet,
+  EditStreakSheet,
+  EditSavedSheet,
   LogPaymentSheet,
   LockInOverlay,
 } from "./modals";
@@ -459,6 +461,18 @@ export default function App() {
         onClose={closeSheet}
         dispatch={dispatch}
         current={state.weeklyBudget}
+      />
+      <EditStreakSheet
+        open={state.sheet === "editStreak"}
+        onClose={closeSheet}
+        dispatch={dispatch}
+        current={state.streak}
+      />
+      <EditSavedSheet
+        open={state.sheet === "editSaved"}
+        onClose={closeSheet}
+        dispatch={dispatch}
+        current={state.saved}
       />
       <LogPaymentSheet
         open={state.sheet === "logPayment"}

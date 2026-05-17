@@ -386,6 +386,95 @@ export const EditBudgetSheet = ({
   );
 };
 
+export const EditStreakSheet = ({
+  open,
+  onClose,
+  dispatch,
+  current,
+}: {
+  open: boolean;
+  onClose: () => void;
+  dispatch: Dispatch;
+  current: number;
+}) => {
+  const [amount, setAmount] = useState(String(current));
+  useEffect(() => {
+    if (open) setAmount(String(current));
+  }, [open, current]);
+  const submit = () => {
+    const n = Number(amount);
+    if (amount === "" || !Number.isFinite(n) || n < 0) return;
+    dispatch({ type: "SET_STREAK", value: Math.max(0, Math.floor(n)) });
+    onClose();
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Streak (weeks)">
+      <Field label="How many weeks is the streak?">
+        <Input
+          value={amount}
+          onChange={setAmount}
+          inputMode="numeric"
+          placeholder="0"
+        />
+      </Field>
+      <Button
+        variant="primary"
+        fullWidth
+        size="lg"
+        onClick={submit}
+        style={{ marginTop: 8 }}
+      >
+        Save streak
+      </Button>
+    </Sheet>
+  );
+};
+
+export const EditSavedSheet = ({
+  open,
+  onClose,
+  dispatch,
+  current,
+}: {
+  open: boolean;
+  onClose: () => void;
+  dispatch: Dispatch;
+  current: number;
+}) => {
+  const [amount, setAmount] = useState(String(current));
+  useEffect(() => {
+    if (open) setAmount(String(current));
+  }, [open, current]);
+  const submit = () => {
+    const n = Number(amount);
+    if (amount === "" || !Number.isFinite(n) || n < 0) return;
+    dispatch({ type: "SET_SAVED", value: n });
+    onClose();
+  };
+  return (
+    <Sheet open={open} onClose={onClose} title="Saved from anti-charity">
+      <Field label="Total saved from anti-charity">
+        <Input
+          value={amount}
+          onChange={setAmount}
+          prefix="$"
+          inputMode="decimal"
+          placeholder="0"
+        />
+      </Field>
+      <Button
+        variant="primary"
+        fullWidth
+        size="lg"
+        onClick={submit}
+        style={{ marginTop: 8 }}
+      >
+        Save total
+      </Button>
+    </Sheet>
+  );
+};
+
 export const LogPaymentSheet = ({
   open,
   onClose,

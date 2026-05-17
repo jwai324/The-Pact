@@ -1015,6 +1015,58 @@ export const FutureQuestsTab = ({
     Side: "var(--teal)",
   };
   const quests = [...state.futureGoals].sort((a, b) => a.sort - b.sort);
+  const urgesTotal =
+    state.urgesSkipped +
+    state.wants.filter((w) => w.decision === "skip").length;
+
+  const overrides: {
+    key: string;
+    label: string;
+    value: string;
+    action: string;
+    onClick: () => void;
+    variant: "purple" | "danger";
+  }[] = [
+    {
+      key: "streak",
+      label: "Streak",
+      value: `${state.streak} ${state.streak === 1 ? "wk" : "wks"}`,
+      action: "Edit",
+      onClick: () => openSheet("editStreak"),
+      variant: "purple",
+    },
+    {
+      key: "saved",
+      label: "Saved from anti-charity",
+      value: `$${state.saved.toLocaleString()}`,
+      action: "Edit",
+      onClick: () => openSheet("editSaved"),
+      variant: "purple",
+    },
+    {
+      key: "urges",
+      label: "Urges skipped",
+      value: String(urgesTotal),
+      action: "Reset",
+      onClick: () => {
+        if (
+          window.confirm(
+            "Reset urges skipped to 0 and erase want history? This can't be undone."
+          )
+        )
+          dispatch({ type: "RESET_URGES" });
+      },
+      variant: "danger",
+    },
+    {
+      key: "budget",
+      label: "Spending max",
+      value: `$${state.weeklyBudget.toLocaleString()}`,
+      action: "Edit",
+      onClick: () => openSheet("editBudget"),
+      variant: "purple",
+    },
+  ];
 
   return (
     <div
@@ -1077,6 +1129,67 @@ export const FutureQuestsTab = ({
           Park ideas here. They never count against you and never auto-fail —
           push one into a spot when you're ready to play it.
         </div>
+      </Card>
+
+      <Card padded={false} style={{ padding: "8px 22px" }}>
+        <div
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            color: "var(--ink-soft)",
+            padding: "14px 0 2px",
+          }}
+        >
+          Manual overrides
+        </div>
+        {overrides.map((o, i) => (
+          <div
+            key={o.key}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "14px 0",
+              borderTop: i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: "var(--body)",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "var(--ink)",
+                }}
+              >
+                {o.label}
+              </div>
+              <div
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "var(--ink-soft)",
+                  marginTop: 2,
+                }}
+              >
+                {o.value}
+              </div>
+            </div>
+            <Button
+              variant={o.variant}
+              size="sm"
+              onClick={o.onClick}
+              style={{ flexShrink: 0 }}
+            >
+              {o.action}
+            </Button>
+          </div>
+        ))}
       </Card>
 
       <Card padded={false} style={{ padding: "8px 22px" }}>
