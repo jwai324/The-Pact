@@ -120,13 +120,21 @@ export const AddGoalSheet = ({
           ? 50
           : defaultCategory === "Monthly"
           ? 100
+          : defaultCategory === "Side"
+          ? 0
           : 150
       );
     }
   }, [open, defaultCategory]);
   useEffect(() => {
     setStake(
-      category === "Weekly" ? 50 : category === "Monthly" ? 100 : 150
+      category === "Weekly"
+        ? 50
+        : category === "Monthly"
+        ? 100
+        : category === "Side"
+        ? 0
+        : 150
     );
   }, [category]);
   const submit = () => {
@@ -157,7 +165,7 @@ export const AddGoalSheet = ({
       </Field>
       <Field label="Category">
         <SegmentedControl
-          options={["Weekly", "Monthly", "Quarterly"]}
+          options={["Weekly", "Monthly", "Quarterly", "Side"]}
           value={category}
           onChange={(v) => setCategory(v as Category)}
         />
