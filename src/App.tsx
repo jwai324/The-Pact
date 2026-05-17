@@ -34,6 +34,61 @@ export default function App() {
   const [state, dispatch] = usePactStore();
   const [now, setNow] = useState(Date.now());
 
+  // Notification preference. Device/browser-specific (tied to the OS-level
+  // permission), so it lives in localStorage rather than the synced store.
+  // Stored "on" only counts if the browser permission is still granted —
+  // so revoking it in browser settings reconciles back to off on next load.
+  const [notifOn, setNotifOn] = useState<boolean>(() => {
+    try {
+      if (localStorage.getItem("pact:notifications") !== "on") return false;
+      return (
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted"
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleNotifications = async () => {
+    const setPref = (on: boolean) => {
+      setNotifOn(on);
+      try {
+        localStorage.setItem("pact:notifications", on ? "on" : "off");
+      } catch {
+        /* storage unavailable — keep the in-memory toggle only */
+      }
+    };
+
+    if (notifOn) {
+      setPref(false);
+      return;
+    }
+    if (typeof Notification === "undefined") return;
+
+    let perm = Notification.permission;
+    if (perm === "default") {
+      try {
+        perm = await Notification.requestPermission();
+      } catch {
+        perm = Notification.permission;
+      }
+    }
+    if (perm === "granted") {
+      setPref(true);
+      try {
+        new Notification("The Pact", {
+          body: "Notifications are on — we'll nudge you about your pact.",
+        });
+      } catch {
+        /* some browsers block construction outside a SW; toggle still on */
+      }
+    } else {
+      // Denied/blocked: can't enable programmatically, stay off.
+      setPref(false);
+    }
+  };
+
   // Easter egg: 5 taps on the home greeting opens the hidden Future Quests
   // page. Taps must be in quick succession (the counter resets after a pause).
   const tapCount = useRef(0);
@@ -205,21 +260,36 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <div
+            <button
+              onClick={toggleNotifications}
+              aria-pressed={notifOn}
+              aria-label={
+                notifOn ? "Turn notifications off" : "Turn notifications on"
+              }
+              title={
+                notifOn ? "Notifications on" : "Notifications off"
+              }
               style={{
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: "white",
+                background: notifOn ? "var(--accent)" : "white",
                 border: "2px solid var(--ink)",
                 boxShadow: "2px 2px 0 var(--ink)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                cursor: "pointer",
+                padding: 0,
               }}
             >
-              <Icon name="bell" size={16} color="var(--ink)" strokeWidth={2.4} />
-            </div>
+              <Icon
+                name={notifOn ? "bell" : "bellOff"}
+                size={16}
+                color={notifOn ? "white" : "var(--ink)"}
+                strokeWidth={2.4}
+              />
+            </button>
             <div
               style={{
                 width: 42,
