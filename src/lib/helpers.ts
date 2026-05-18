@@ -70,6 +70,20 @@ export const currentWeek = () => {
   };
 };
 
+// Append newly-earned trophy ids to this week's completed set, resetting it
+// when the week has rolled over since it was last written. The home cabinet
+// reads this, so it naturally empties to uncompleted trophies each new week.
+export const mergeWeeklyTrophies = (
+  prevIds: string[],
+  prevWeek: string | null,
+  newIds: string[]
+): { ids: string[]; week: string } => {
+  const week = currentWeek().weekKey;
+  const ids = prevWeek === week ? [...prevIds] : [];
+  for (const id of newIds) if (!ids.includes(id)) ids.push(id);
+  return { ids, week };
+};
+
 // ── Period rollover ─────────────────────────────────────────────────────────
 // The app is client-only (no cron), so overdue quests are reconciled the next
 // time it's opened. We persist the last period each category was reconciled
