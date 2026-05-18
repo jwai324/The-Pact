@@ -1,5 +1,15 @@
 import type { Category, DataSlice } from "../state/types";
 
+// Wall-clock "now" in America/New_York regardless of the device's timezone.
+// The day/week/month/quarter boundaries — and the quest auto-fail sweep that
+// rides on them — therefore roll over at Eastern midnight. DST-correct: Intl
+// applies whichever offset (EST/EDT) is in effect for the date.
+const EASTERN_TZ = "America/New_York";
+export const easternNow = (): Date =>
+  new Date(new Date().toLocaleString("en-US", { timeZone: EASTERN_TZ }));
+
+const pad2 = (n: number): string => String(n).padStart(2, "0");
+
 // ── Time helpers (ported verbatim from components.jsx) ──────────────────────
 export const formatRelative = (date: Date, now: Date = new Date()): string => {
   const ms = date.getTime() - now.getTime();
@@ -41,14 +51,18 @@ export const computeRelative = (category: Category): string => {
 };
 
 export const currentWeek = () => {
-  const today = new Date();
-  const monday = new Date(today);
+  const monday = easternNow();
   const day = monday.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   monday.setDate(monday.getDate() + diff);
   monday.setHours(0, 0, 0, 0);
   return {
-    weekKey: monday.toISOString().slice(0, 10),
+    // Built from the Eastern calendar fields directly (not toISOString, which
+    // would re-shift by the device's UTC offset) so the key is the Eastern
+    // week-start regardless of where the browser runs.
+    weekKey: `${monday.getFullYear()}-${pad2(monday.getMonth() + 1)}-${pad2(
+      monday.getDate()
+    )}`,
     weekLabel: monday.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -61,12 +75,12 @@ export const currentWeek = () => {
 // time it's opened. We persist the last period each category was reconciled
 // for and compare it to the current period on load. Keys are designed so a
 // plain string `<` is a correct chronological compare, including year wrap.
-const pad2 = (n: number): string => String(n).padStart(2, "0");
-
-export const currentMonthKey = (now: Date = new Date()): string =>
+// Default to Eastern time so month/quarter rollover (and the auto-fail it
+// triggers) lands at Eastern midnight, not the device's local midnight.
+export const currentMonthKey = (now: Date = easternNow()): string =>
   `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 
-export const currentQuarterKey = (now: Date = new Date()): string =>
+export const currentQuarterKey = (now: Date = easternNow()): string =>
   `${now.getFullYear()}-Q${Math.floor(now.getMonth() / 3) + 1}`;
 
 export interface PeriodKeys {
