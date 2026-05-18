@@ -381,27 +381,26 @@ export const TodayTab = ({
   const earnedCount = TROPHIES.filter(
     (t) => (state.badges[t.id] ?? 0) > 0
   ).length;
-  // Home is a teaser, capped at 8: just-earned ("new") trophies first, then
-  // a random rotation of unearned ones (stable per day, reshuffles every
-  // 24h), then any other earned trophies if slots remain. The full set lives
-  // on the Trophies page.
+  // Home cabinet (capped at 8): trophies completed THIS week first, then a
+  // random rotation of uncompleted ones (stable per day, reshuffles every
+  // 24h). The weekly set empties when the week rolls over, so the cabinet
+  // resets to uncompleted trophies each new week. Full set on the Trophies
+  // page.
   const cabinetPreview = (() => {
-    const newOnes = TROPHIES.filter((t) =>
-      isNewTrophy(t, state.badges, state.seenTrophies)
+    const weeklyDone =
+      state.weeklyTrophyWeek === state.currentWeek
+        ? state.weeklyTrophies
+        : [];
+    const completedThisWeek = TROPHIES.filter(
+      (t) => weeklyDone.includes(t.id) && (state.badges[t.id] ?? 0) > 0
     );
-    const unearned = TROPHIES.filter(
+    const uncompleted = TROPHIES.filter(
       (t) => (state.badges[t.id] ?? 0) === 0
-    );
-    const earnedSeen = TROPHIES.filter(
-      (t) =>
-        (state.badges[t.id] ?? 0) > 0 &&
-        !isNewTrophy(t, state.badges, state.seenTrophies)
     );
     const dayIndex = Math.floor(Date.now() / 86400000);
     return [
-      ...newOnes,
-      ...seededShuffle(unearned, dayIndex),
-      ...earnedSeen,
+      ...completedThisWeek,
+      ...seededShuffle(uncompleted, dayIndex),
     ].slice(0, 8);
   })();
   const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);

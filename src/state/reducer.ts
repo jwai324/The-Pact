@@ -1,5 +1,9 @@
 import type { State, Action, Goal } from "./types";
-import { computeRelative, currentWeek } from "../lib/helpers";
+import {
+  computeRelative,
+  currentWeek,
+  mergeWeeklyTrophies,
+} from "../lib/helpers";
 
 export const emptyState = (): State => {
   const { weekKey, weekLabel } = currentWeek();
@@ -15,6 +19,8 @@ export const emptyState = (): State => {
     badges: {},
     activeTrophies: [],
     seenTrophies: [],
+    weeklyTrophies: [],
+    weeklyTrophyWeek: null,
     goals: [],
     futureGoals: [],
     tasks: [],
@@ -162,7 +168,18 @@ export function reducer(state: State, action: Action): State {
       // next evaluation can tell a fresh earn from a still-held one.
       const badges = { ...state.badges };
       for (const id of action.ids) badges[id] = (badges[id] ?? 0) + 1;
-      return { ...state, badges, activeTrophies: action.active };
+      const weekly = mergeWeeklyTrophies(
+        state.weeklyTrophies,
+        state.weeklyTrophyWeek,
+        action.ids
+      );
+      return {
+        ...state,
+        badges,
+        activeTrophies: action.active,
+        weeklyTrophies: weekly.ids,
+        weeklyTrophyWeek: weekly.week,
+      };
     }
     case "ADD_BADGE": {
       // Manual earn (hidden Future Quests screen). Bumps the lifetime count
@@ -170,7 +187,17 @@ export function reducer(state: State, action: Action): State {
       // evaluator dep, so this won't trigger a re-award).
       const badges = { ...state.badges };
       badges[action.id] = (badges[action.id] ?? 0) + 1;
-      return { ...state, badges };
+      const weekly = mergeWeeklyTrophies(
+        state.weeklyTrophies,
+        state.weeklyTrophyWeek,
+        [action.id]
+      );
+      return {
+        ...state,
+        badges,
+        weeklyTrophies: weekly.ids,
+        weeklyTrophyWeek: weekly.week,
+      };
     }
     case "REMOVE_BADGE": {
       // Manual un-earn: decrement by one, dropping the key at zero so the
@@ -184,7 +211,11 @@ export function reducer(state: State, action: Action): State {
         next > 0
           ? state.seenTrophies
           : state.seenTrophies.filter((x) => x !== action.id);
-      return { ...state, badges, seenTrophies };
+      const weeklyTrophies =
+        next > 0
+          ? state.weeklyTrophies
+          : state.weeklyTrophies.filter((x) => x !== action.id);
+      return { ...state, badges, seenTrophies, weeklyTrophies };
     }
     case "SEE_TROPHY":
       // The user opened this trophy's detail — clear its "new" stamp.

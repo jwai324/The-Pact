@@ -69,6 +69,11 @@ export interface DataSlice {
   // Earned trophy ids the user has already opened. An earned trophy NOT in
   // this list is "new" and gets a stamp until viewed.
   seenTrophies: string[];
+  // Trophy ids earned during `weeklyTrophyWeek` (a week key). The home
+  // cabinet shows these, then empties back to uncompleted trophies once the
+  // week rolls over (week key no longer matches the current week).
+  weeklyTrophies: string[];
+  weeklyTrophyWeek: string | null;
   goals: Goal[];
   futureGoals: Goal[];
   tasks: Task[];

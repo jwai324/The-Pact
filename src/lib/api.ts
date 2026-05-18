@@ -1,5 +1,9 @@
 import { supabase } from "./supabase";
-import { computeRelative, currentWeek } from "./helpers";
+import {
+  computeRelative,
+  currentWeek,
+  mergeWeeklyTrophies,
+} from "./helpers";
 import type { Rollover } from "./helpers";
 import type {
   Action,
@@ -124,6 +128,8 @@ export async function fetchAll(): Promise<DataSlice> {
   let badges: Record<string, number> = {};
   let activeTrophies: string[] = [];
   let seenTrophies: string[] | null = null;
+  let weeklyTrophies: string[] = [];
+  let weeklyTrophyWeek: string | null = null;
   if (Array.isArray(rawBadges)) {
     for (const id of rawBadges as string[]) badges[id] = 1;
     activeTrophies = [...(rawBadges as string[])];
@@ -132,10 +138,13 @@ export async function fetchAll(): Promise<DataSlice> {
       counts?: Record<string, number>;
       active?: string[];
       seen?: string[];
+      weekly?: { key?: string | null; ids?: string[] };
     };
     badges = o.counts ?? {};
     activeTrophies = o.active ?? [];
     seenTrophies = o.seen ?? null;
+    weeklyTrophies = o.weekly?.ids ?? [];
+    weeklyTrophyWeek = o.weekly?.key ?? null;
   }
   // First run with no stored `seen`: treat every already-earned trophy as
   // seen so the historical backlog doesn't all light up as "new". Only
@@ -153,6 +162,8 @@ export async function fetchAll(): Promise<DataSlice> {
     badges,
     activeTrophies,
     seenTrophies,
+    weeklyTrophies,
+    weeklyTrophyWeek,
     goals,
     futureGoals,
     tasks,
@@ -443,6 +454,11 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         const counts: Record<string, number> = { ...prev.badges };
         for (const id of action.ids)
           counts[id] = (counts[id] ?? 0) + 1;
+        const weekly = mergeWeeklyTrophies(
+          prev.weeklyTrophies,
+          prev.weeklyTrophyWeek,
+          action.ids
+        );
         await supabase
           .from("app_state")
           .update({
@@ -450,6 +466,7 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
               counts,
               active: action.active,
               seen: prev.seenTrophies,
+              weekly,
             },
           })
           .eq("id", 1);
@@ -458,6 +475,11 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
       case "ADD_BADGE": {
         const counts: Record<string, number> = { ...prev.badges };
         counts[action.id] = (counts[action.id] ?? 0) + 1;
+        const weekly = mergeWeeklyTrophies(
+          prev.weeklyTrophies,
+          prev.weeklyTrophyWeek,
+          [action.id]
+        );
         await supabase
           .from("app_state")
           .update({
@@ -465,6 +487,7 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
               counts,
               active: prev.activeTrophies,
               seen: prev.seenTrophies,
+              weekly,
             },
           })
           .eq("id", 1);
@@ -479,10 +502,19 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           next > 0
             ? prev.seenTrophies
             : prev.seenTrophies.filter((x) => x !== action.id);
+        const weeklyIds =
+          next > 0
+            ? prev.weeklyTrophies
+            : prev.weeklyTrophies.filter((x) => x !== action.id);
         await supabase
           .from("app_state")
           .update({
-            badges: { counts, active: prev.activeTrophies, seen },
+            badges: {
+              counts,
+              active: prev.activeTrophies,
+              seen,
+              weekly: { key: prev.weeklyTrophyWeek, ids: weeklyIds },
+            },
           })
           .eq("id", 1);
         return true;
@@ -496,6 +528,10 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
               counts: prev.badges,
               active: prev.activeTrophies,
               seen: [...prev.seenTrophies, action.id],
+              weekly: {
+                key: prev.weeklyTrophyWeek,
+                ids: prev.weeklyTrophies,
+              },
             },
           })
           .eq("id", 1);
