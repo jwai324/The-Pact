@@ -18,6 +18,7 @@ import {
   SpendTab,
   PactTab,
   FutureQuestsTab,
+  TrophiesTab,
 } from "./tabs";
 import {
   AddWantSheet,
@@ -130,8 +131,11 @@ export default function App() {
     state.urgesSkipped,
     state.wants,
     state.goals,
+    state.futureGoals,
     state.spending,
     state.currentWeek,
+    state.tasks,
+    state.payments,
     state.activeTrophies,
     dispatch,
   ]);
@@ -183,6 +187,7 @@ export default function App() {
         openSheet={openSheet}
       />
     ),
+    trophies: <TrophiesTab state={state} dispatch={dispatch} />,
   };
 
   // Live date for the header eyebrows (re-derived from `now`, which ticks
@@ -210,6 +215,7 @@ export default function App() {
     spend: { eyebrow: `${dateLabel} · RESETS MON`, title: "Spending" },
     pact: { eyebrow: "WITH JUSTIN WAI", title: "The Pact" },
     future: { eyebrow: "HIDDEN · THE STASH", title: "Future Quests" },
+    trophies: { eyebrow: "THE TROPHY CABINET", title: "Trophies" },
   };
 
   return (

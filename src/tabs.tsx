@@ -23,6 +23,277 @@ import { TROPHIES, type Trophy } from "./lib/trophies";
 type Dispatch = (a: Action) => void;
 type OpenSheet = (sheet: string, data?: State["sheetData"]) => void;
 
+// Shared trophy grid — every trophy, locked or earned. Used by the home
+// preview and the full Trophies page so both look and behave identically.
+const TrophyGrid = ({
+  badges,
+  onSelect,
+}: {
+  badges: Record<string, number>;
+  onSelect: (t: Trophy) => void;
+}) => (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(4, 1fr)",
+      gap: 10,
+    }}
+  >
+    {TROPHIES.map((t) => {
+      const count = badges[t.id] ?? 0;
+      const earned = count > 0;
+      return (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onSelect(t)}
+          aria-label={`${t.name}${
+            earned
+              ? ` (earned${count > 1 ? ` ${count} times` : ""})`
+              : " — how to earn"
+          }`}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 4,
+            opacity: earned ? 1 : 0.32,
+            filter: earned ? "none" : "grayscale(0.5)",
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            font: "inherit",
+          }}
+        >
+          <div
+            id={`trophy-slot-${t.id}`}
+            style={{
+              position: "relative",
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: earned ? t.color : "white",
+              border: "2px solid var(--ink)",
+              boxShadow: earned ? "2px 2px 0 var(--ink)" : "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {count > 1 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -7,
+                  right: -7,
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 4px",
+                  borderRadius: 9,
+                  background: "var(--ink)",
+                  color: "white",
+                  border: "2px solid white",
+                  fontFamily: "var(--mono)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  lineHeight: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ×{count}
+              </span>
+            )}
+            <Icon
+              name={t.icon}
+              size={22}
+              color={earned ? "white" : "var(--ink)"}
+              strokeWidth={2.2}
+            />
+          </div>
+          <span
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 9.5,
+              color: "var(--ink)",
+              fontWeight: 600,
+              letterSpacing: "0.02em",
+              textAlign: "center",
+            }}
+          >
+            {t.name}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+);
+
+// Shared "how to earn it" detail sheet — opened by tapping any trophy in
+// either the home cabinet or the Trophies page.
+const TrophyDetailSheet = ({
+  trophy,
+  count,
+  onClose,
+}: {
+  trophy: Trophy | null;
+  count: number;
+  onClose: () => void;
+}) => (
+  <Sheet
+    open={!!trophy}
+    onClose={onClose}
+    title={trophy ? `${trophy.name} ${count > 0 ? "🏆" : "🔒"}` : ""}
+  >
+    {trophy && (
+      <>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 20,
+              background: trophy.color,
+              border: "2px solid var(--ink)",
+              boxShadow: "3px 3px 0 var(--ink)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon
+              name={trophy.icon}
+              size={34}
+              color="white"
+              strokeWidth={2.2}
+            />
+          </div>
+        </div>
+        <Eyebrow>
+          {count > 1
+            ? `Earned ×${count}`
+            : count > 0
+            ? "Earned"
+            : "How to earn it"}
+        </Eyebrow>
+        <div
+          style={{
+            fontFamily: "var(--body)",
+            fontSize: 15,
+            color: "var(--ink-soft)",
+            marginTop: 8,
+            lineHeight: 1.55,
+            fontWeight: 500,
+          }}
+        >
+          {trophy.how}
+        </div>
+      </>
+    )}
+  </Sheet>
+);
+
+// Full-screen browse of every trophy. Reached by tapping the "Trophy
+// Cabinet" header on the home page.
+export const TrophiesTab = ({
+  state,
+  dispatch,
+}: {
+  state: State;
+  dispatch: Dispatch;
+}) => {
+  const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
+  const earnedCount = TROPHIES.filter(
+    (t) => (state.badges[t.id] ?? 0) > 0
+  ).length;
+  return (
+    <div
+      style={{
+        padding: "8px 20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
+      <button
+        onClick={() => dispatch({ type: "TAB", tab: "today" })}
+        style={{
+          alignSelf: "flex-start",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          fontWeight: 700,
+          color: "var(--ink-soft)",
+        }}
+      >
+        <span style={{ fontSize: 14 }}>&larr;</span> Back home
+      </button>
+
+      <Card
+        padded={false}
+        style={{ padding: "20px 22px" }}
+        color="var(--purple-soft)"
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 6,
+          }}
+        >
+          <Eyebrow>All Trophies</Eyebrow>
+          <span
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 11,
+              color: "var(--purple)",
+              fontWeight: 700,
+            }}
+          >
+            {earnedCount}/{TROPHIES.length}
+          </span>
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--body)",
+            fontSize: 13,
+            color: "var(--ink-soft)",
+            lineHeight: 1.5,
+            fontWeight: 500,
+            marginBottom: 16,
+          }}
+        >
+          Tap any trophy to see how to earn it.
+        </div>
+        <TrophyGrid badges={state.badges} onSelect={setOpenTrophy} />
+      </Card>
+
+      <TrophyDetailSheet
+        trophy={openTrophy}
+        count={openTrophy ? state.badges[openTrophy.id] ?? 0 : 0}
+        onClose={() => setOpenTrophy(null)}
+      />
+    </div>
+  );
+};
+
 export const TodayTab = ({
   state,
   dispatch,
@@ -403,7 +674,26 @@ export const TodayTab = ({
             marginBottom: 14,
           }}
         >
-          <Eyebrow>Trophy Cabinet</Eyebrow>
+          <button
+            onClick={() => dispatch({ type: "TAB", tab: "trophies" })}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+            }}
+          >
+            <Eyebrow>Trophy Cabinet</Eyebrow>
+            <Icon
+              name="chevronRight"
+              size={14}
+              strokeWidth={2.6}
+              color="var(--purple)"
+            />
+          </button>
           <span
             style={{
               fontFamily: "var(--mono)",
@@ -415,168 +705,14 @@ export const TodayTab = ({
             {earnedCount}/{TROPHIES.length}
           </span>
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 10,
-          }}
-        >
-          {TROPHIES.map((t) => {
-            const count = state.badges[t.id] ?? 0;
-            const earned = count > 0;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setOpenTrophy(t)}
-                aria-label={`${t.name}${
-                  earned
-                    ? ` (earned${count > 1 ? ` ${count} times` : ""})`
-                    : " — how to earn"
-                }`}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 4,
-                  opacity: earned ? 1 : 0.32,
-                  filter: earned ? "none" : "grayscale(0.5)",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  font: "inherit",
-                }}
-              >
-                <div
-                  id={`trophy-slot-${t.id}`}
-                  style={{
-                    position: "relative",
-                    width: 48,
-                    height: 48,
-                    borderRadius: 14,
-                    background: earned ? t.color : "white",
-                    border: "2px solid var(--ink)",
-                    boxShadow: earned ? "2px 2px 0 var(--ink)" : "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {count > 1 && (
-                    <span
-                      style={{
-                        position: "absolute",
-                        top: -7,
-                        right: -7,
-                        minWidth: 18,
-                        height: 18,
-                        padding: "0 4px",
-                        borderRadius: 9,
-                        background: "var(--ink)",
-                        color: "white",
-                        border: "2px solid white",
-                        fontFamily: "var(--mono)",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        lineHeight: "14px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      ×{count}
-                    </span>
-                  )}
-                  <Icon
-                    name={t.icon}
-                    size={22}
-                    color={earned ? "white" : "var(--ink)"}
-                    strokeWidth={2.2}
-                  />
-                </div>
-                <span
-                  style={{
-                    fontFamily: "var(--mono)",
-                    fontSize: 9.5,
-                    color: "var(--ink)",
-                    fontWeight: 600,
-                    letterSpacing: "0.02em",
-                    textAlign: "center",
-                  }}
-                >
-                  {t.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <TrophyGrid badges={state.badges} onSelect={setOpenTrophy} />
       </Card>
 
-      <Sheet
-        open={!!openTrophy}
+      <TrophyDetailSheet
+        trophy={openTrophy}
+        count={openTrophy ? state.badges[openTrophy.id] ?? 0 : 0}
         onClose={() => setOpenTrophy(null)}
-        title={
-          openTrophy
-            ? `${openTrophy.name} ${
-                (state.badges[openTrophy.id] ?? 0) > 0 ? "🏆" : "🔒"
-              }`
-            : ""
-        }
-      >
-        {openTrophy && (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginBottom: 20,
-              }}
-            >
-              <div
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 20,
-                  background: openTrophy.color,
-                  border: "2px solid var(--ink)",
-                  boxShadow: "3px 3px 0 var(--ink)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon
-                  name={openTrophy.icon}
-                  size={34}
-                  color="white"
-                  strokeWidth={2.2}
-                />
-              </div>
-            </div>
-            <Eyebrow>
-              {(state.badges[openTrophy.id] ?? 0) > 1
-                ? `Earned ×${state.badges[openTrophy.id]}`
-                : (state.badges[openTrophy.id] ?? 0) > 0
-                ? "Earned"
-                : "How to earn it"}
-            </Eyebrow>
-            <div
-              style={{
-                fontFamily: "var(--body)",
-                fontSize: 15,
-                color: "var(--ink-soft)",
-                marginTop: 8,
-                lineHeight: 1.55,
-                fontWeight: 500,
-              }}
-            >
-              {openTrophy.how}
-            </div>
-          </>
-        )}
-      </Sheet>
+      />
     </div>
   );
 };
