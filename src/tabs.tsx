@@ -23,14 +23,16 @@ import { TROPHIES, type Trophy } from "./lib/trophies";
 type Dispatch = (a: Action) => void;
 type OpenSheet = (sheet: string, data?: State["sheetData"]) => void;
 
-// Shared trophy grid — every trophy, locked or earned. Used by the home
-// preview and the full Trophies page so both look and behave identically.
+// Shared trophy grid. Renders the given trophies (defaults to all) so the
+// home preview and the full Trophies page look and behave identically.
 const TrophyGrid = ({
   badges,
   onSelect,
+  trophies = TROPHIES,
 }: {
   badges: Record<string, number>;
   onSelect: (t: Trophy) => void;
+  trophies?: Trophy[];
 }) => (
   <div
     style={{
@@ -39,7 +41,7 @@ const TrophyGrid = ({
       gap: 10,
     }}
   >
-    {TROPHIES.map((t) => {
+    {trophies.map((t) => {
       const count = badges[t.id] ?? 0;
       const earned = count > 0;
       return (
@@ -317,6 +319,13 @@ export const TodayTab = ({
   const earnedCount = TROPHIES.filter(
     (t) => (state.badges[t.id] ?? 0) > 0
   ).length;
+  // Home is a teaser: up to 3 earned trophies, the rest filled with locked
+  // ones, capped at 8. The full set lives on the Trophies page.
+  const cabinetPreview = (() => {
+    const earned = TROPHIES.filter((t) => (state.badges[t.id] ?? 0) > 0);
+    const locked = TROPHIES.filter((t) => (state.badges[t.id] ?? 0) === 0);
+    return [...earned.slice(0, 3), ...locked].slice(0, 8);
+  })();
   const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
 
   return (
@@ -705,7 +714,11 @@ export const TodayTab = ({
             {earnedCount}/{TROPHIES.length}
           </span>
         </div>
-        <TrophyGrid badges={state.badges} onSelect={setOpenTrophy} />
+        <TrophyGrid
+          badges={state.badges}
+          onSelect={setOpenTrophy}
+          trophies={cabinetPreview}
+        />
       </Card>
 
       <TrophyDetailSheet
