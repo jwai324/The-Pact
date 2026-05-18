@@ -115,13 +115,15 @@ export async function fetchAll(): Promise<DataSlice> {
     proofUrl: p.proof_url ?? null,
   }));
 
-  // `badges` jsonb holds { counts, active }. Legacy rows store a bare array of
-  // earned ids (incl. the display-name seed, which never matched a trophy id
-  // and stays inert): map each to one earning and treat them as still active
-  // so the first post-deploy evaluation doesn't re-count held trophies.
+  // `badges` jsonb holds { counts, active, seen }. Legacy rows store a bare
+  // array of earned ids (incl. the display-name seed, which never matched a
+  // trophy id and stays inert): map each to one earning and treat them as
+  // still active so the first post-deploy evaluation doesn't re-count held
+  // trophies.
   const rawBadges = a?.badges as unknown;
   let badges: Record<string, number> = {};
   let activeTrophies: string[] = [];
+  let seenTrophies: string[] | null = null;
   if (Array.isArray(rawBadges)) {
     for (const id of rawBadges as string[]) badges[id] = 1;
     activeTrophies = [...(rawBadges as string[])];
@@ -129,9 +131,17 @@ export async function fetchAll(): Promise<DataSlice> {
     const o = rawBadges as {
       counts?: Record<string, number>;
       active?: string[];
+      seen?: string[];
     };
     badges = o.counts ?? {};
     activeTrophies = o.active ?? [];
+    seenTrophies = o.seen ?? null;
+  }
+  // First run with no stored `seen`: treat every already-earned trophy as
+  // seen so the historical backlog doesn't all light up as "new". Only
+  // trophies earned from here on get the stamp.
+  if (seenTrophies === null) {
+    seenTrophies = Object.keys(badges).filter((id) => badges[id] > 0);
   }
 
   return {
@@ -142,6 +152,7 @@ export async function fetchAll(): Promise<DataSlice> {
     lastLockedStakes: a ? Number(a.last_locked_stakes) : 0,
     badges,
     activeTrophies,
+    seenTrophies,
     goals,
     futureGoals,
     tasks,
@@ -434,7 +445,13 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           counts[id] = (counts[id] ?? 0) + 1;
         await supabase
           .from("app_state")
-          .update({ badges: { counts, active: action.active } })
+          .update({
+            badges: {
+              counts,
+              active: action.active,
+              seen: prev.seenTrophies,
+            },
+          })
           .eq("id", 1);
         return true;
       }
@@ -443,7 +460,13 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         counts[action.id] = (counts[action.id] ?? 0) + 1;
         await supabase
           .from("app_state")
-          .update({ badges: { counts, active: prev.activeTrophies } })
+          .update({
+            badges: {
+              counts,
+              active: prev.activeTrophies,
+              seen: prev.seenTrophies,
+            },
+          })
           .eq("id", 1);
         return true;
       }
@@ -452,9 +475,29 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         const next = (counts[action.id] ?? 0) - 1;
         if (next > 0) counts[action.id] = next;
         else delete counts[action.id];
+        const seen =
+          next > 0
+            ? prev.seenTrophies
+            : prev.seenTrophies.filter((x) => x !== action.id);
         await supabase
           .from("app_state")
-          .update({ badges: { counts, active: prev.activeTrophies } })
+          .update({
+            badges: { counts, active: prev.activeTrophies, seen },
+          })
+          .eq("id", 1);
+        return true;
+      }
+      case "SEE_TROPHY": {
+        if (prev.seenTrophies.includes(action.id)) return false;
+        await supabase
+          .from("app_state")
+          .update({
+            badges: {
+              counts: prev.badges,
+              active: prev.activeTrophies,
+              seen: [...prev.seenTrophies, action.id],
+            },
+          })
           .eq("id", 1);
         return true;
       }

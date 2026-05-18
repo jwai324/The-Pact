@@ -66,6 +66,9 @@ export interface DataSlice {
   // Persisted so a not-met -> met transition (a fresh earn) can be detected
   // across reloads without re-counting every refresh.
   activeTrophies: string[];
+  // Earned trophy ids the user has already opened. An earned trophy NOT in
+  // this list is "new" and gets a stamp until viewed.
+  seenTrophies: string[];
   goals: Goal[];
   futureGoals: Goal[];
   tasks: Task[];
@@ -125,6 +128,7 @@ export type Action =
   | { type: "AWARD_BADGES"; ids: string[]; active: string[] }
   | { type: "ADD_BADGE"; id: string }
   | { type: "REMOVE_BADGE"; id: string }
+  | { type: "SEE_TROPHY"; id: string }
   | { type: "SET_BUDGET"; amount: number }
   | { type: "SET_STREAK"; value: number }
   | { type: "SET_SAVED"; value: number }

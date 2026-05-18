@@ -14,6 +14,7 @@ export const emptyState = (): State => {
     lastLockedStakes: 0,
     badges: {},
     activeTrophies: [],
+    seenTrophies: [],
     goals: [],
     futureGoals: [],
     tasks: [],
@@ -173,13 +174,23 @@ export function reducer(state: State, action: Action): State {
     }
     case "REMOVE_BADGE": {
       // Manual un-earn: decrement by one, dropping the key at zero so the
-      // cabinet reads it as locked.
+      // cabinet reads it as locked. Once fully un-earned, forget it was seen
+      // so a future re-earn shows the "new" stamp again.
       const badges = { ...state.badges };
       const next = (badges[action.id] ?? 0) - 1;
       if (next > 0) badges[action.id] = next;
       else delete badges[action.id];
-      return { ...state, badges };
+      const seenTrophies =
+        next > 0
+          ? state.seenTrophies
+          : state.seenTrophies.filter((x) => x !== action.id);
+      return { ...state, badges, seenTrophies };
     }
+    case "SEE_TROPHY":
+      // The user opened this trophy's detail — clear its "new" stamp.
+      return state.seenTrophies.includes(action.id)
+        ? state
+        : { ...state, seenTrophies: [...state.seenTrophies, action.id] };
     case "SET_BUDGET":
       return { ...state, weeklyBudget: action.amount };
     case "SET_STREAK":
