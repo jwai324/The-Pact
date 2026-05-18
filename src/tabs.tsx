@@ -492,7 +492,7 @@ export const TodayTab = ({
                   <Icon
                     name={t.icon}
                     size={22}
-                    color="white"
+                    color={earned ? "white" : "var(--ink)"}
                     strokeWidth={2.2}
                   />
                 </div>
