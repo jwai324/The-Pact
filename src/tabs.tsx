@@ -23,14 +23,40 @@ import { TROPHIES, type Trophy } from "./lib/trophies";
 type Dispatch = (a: Action) => void;
 type OpenSheet = (sheet: string, data?: State["sheetData"]) => void;
 
+// Deterministic shuffle seeded by an integer (mulberry32). Same seed -> same
+// order, so the home page's random unearned picks stay stable within a day.
+const seededShuffle = <T,>(arr: T[], seed: number): T[] => {
+  let s = seed >>> 0;
+  const rand = () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const isNewTrophy = (
+  t: Trophy,
+  badges: Record<string, number>,
+  seen: string[]
+) => (badges[t.id] ?? 0) > 0 && !seen.includes(t.id);
+
 // Shared trophy grid. Renders the given trophies (defaults to all) so the
 // home preview and the full Trophies page look and behave identically.
 const TrophyGrid = ({
   badges,
+  seen,
   onSelect,
   trophies = TROPHIES,
 }: {
   badges: Record<string, number>;
+  seen: string[];
   onSelect: (t: Trophy) => void;
   trophies?: Trophy[];
 }) => (
@@ -44,6 +70,7 @@ const TrophyGrid = ({
     {trophies.map((t) => {
       const count = badges[t.id] ?? 0;
       const earned = count > 0;
+      const isNew = isNewTrophy(t, badges, seen);
       return (
         <button
           key={t.id}
@@ -51,7 +78,9 @@ const TrophyGrid = ({
           onClick={() => onSelect(t)}
           aria-label={`${t.name}${
             earned
-              ? ` (earned${count > 1 ? ` ${count} times` : ""})`
+              ? ` (earned${count > 1 ? ` ${count} times` : ""}${
+                  isNew ? ", new" : ""
+                })`
               : " — how to earn"
           }`}
           style={{
@@ -83,6 +112,31 @@ const TrophyGrid = ({
               justifyContent: "center",
             }}
           >
+            {isNew && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -8,
+                  left: -8,
+                  padding: "0 5px",
+                  height: 16,
+                  borderRadius: 8,
+                  background: "var(--red)",
+                  color: "white",
+                  border: "2px solid white",
+                  fontFamily: "var(--mono)",
+                  fontSize: 8,
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  lineHeight: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                NEW
+              </span>
+            )}
             {count > 1 && (
               <span
                 style={{
@@ -284,7 +338,15 @@ export const TrophiesTab = ({
         >
           Tap any trophy to see how to earn it.
         </div>
-        <TrophyGrid badges={state.badges} onSelect={setOpenTrophy} />
+        <TrophyGrid
+          badges={state.badges}
+          seen={state.seenTrophies}
+          onSelect={(t) => {
+            setOpenTrophy(t);
+            if (isNewTrophy(t, state.badges, state.seenTrophies))
+              dispatch({ type: "SEE_TROPHY", id: t.id });
+          }}
+        />
       </Card>
 
       <TrophyDetailSheet
@@ -319,12 +381,28 @@ export const TodayTab = ({
   const earnedCount = TROPHIES.filter(
     (t) => (state.badges[t.id] ?? 0) > 0
   ).length;
-  // Home is a teaser: up to 3 earned trophies, the rest filled with locked
-  // ones, capped at 8. The full set lives on the Trophies page.
+  // Home is a teaser, capped at 8: just-earned ("new") trophies first, then
+  // a random rotation of unearned ones (stable per day, reshuffles every
+  // 24h), then any other earned trophies if slots remain. The full set lives
+  // on the Trophies page.
   const cabinetPreview = (() => {
-    const earned = TROPHIES.filter((t) => (state.badges[t.id] ?? 0) > 0);
-    const locked = TROPHIES.filter((t) => (state.badges[t.id] ?? 0) === 0);
-    return [...earned.slice(0, 3), ...locked].slice(0, 8);
+    const newOnes = TROPHIES.filter((t) =>
+      isNewTrophy(t, state.badges, state.seenTrophies)
+    );
+    const unearned = TROPHIES.filter(
+      (t) => (state.badges[t.id] ?? 0) === 0
+    );
+    const earnedSeen = TROPHIES.filter(
+      (t) =>
+        (state.badges[t.id] ?? 0) > 0 &&
+        !isNewTrophy(t, state.badges, state.seenTrophies)
+    );
+    const dayIndex = Math.floor(Date.now() / 86400000);
+    return [
+      ...newOnes,
+      ...seededShuffle(unearned, dayIndex),
+      ...earnedSeen,
+    ].slice(0, 8);
   })();
   const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
 
@@ -716,7 +794,12 @@ export const TodayTab = ({
         </div>
         <TrophyGrid
           badges={state.badges}
-          onSelect={setOpenTrophy}
+          seen={state.seenTrophies}
+          onSelect={(t) => {
+            setOpenTrophy(t);
+            if (isNewTrophy(t, state.badges, state.seenTrophies))
+              dispatch({ type: "SEE_TROPHY", id: t.id });
+          }}
           trophies={cabinetPreview}
         />
       </Card>
