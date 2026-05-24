@@ -46,6 +46,17 @@ export const TodayTab = ({
   const earnedCount = TROPHIES.filter((t) =>
     state.badges.includes(t.id)
   ).length;
+  // Newest earned trophies first (badges are append-only, so reversing the
+  // earned slice puts the most recent unlock at the top of the cabinet),
+  // then unearned trophies fill out the grid in canonical order.
+  const cabinetTrophies = [
+    ...state.badges
+      .slice()
+      .reverse()
+      .map((id) => TROPHIES.find((t) => t.id === id))
+      .filter((t): t is Trophy => !!t),
+    ...TROPHIES.filter((t) => !state.badges.includes(t.id)),
+  ];
   const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
 
   return (
@@ -422,7 +433,7 @@ export const TodayTab = ({
             gap: 10,
           }}
         >
-          {TROPHIES.map((t) => {
+          {cabinetTrophies.map((t) => {
             const earned = state.badges.includes(t.id);
             return (
               <button
