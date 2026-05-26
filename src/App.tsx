@@ -2,7 +2,7 @@
 // removed, in-memory seed replaced with Supabase-backed store).
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePactStore } from "./state/store";
-import type { Category, State } from "./state/types";
+import type { Category, SpendCategory, State } from "./state/types";
 import { Icon, Eyebrow, Display, Confetti } from "./components/ui";
 import { TrophyReveal } from "./components/TrophyReveal";
 import {
@@ -455,12 +455,22 @@ export default function App() {
         open={state.sheet === "logSpend"}
         onClose={closeSheet}
         dispatch={dispatch}
+        defaultCategory={state.sheetData.spendCategory}
       />
       <EditBudgetSheet
         open={state.sheet === "editBudget"}
         onClose={closeSheet}
         dispatch={dispatch}
-        current={state.weeklyBudget}
+        category={
+          (state.sheetData.spendCategory as SpendCategory) ?? "Necessities"
+        }
+        current={
+          state.sheetData.spendCategory === "Semi-necessities"
+            ? state.budgets.semiNecessities
+            : state.sheetData.spendCategory === "Discretionary"
+            ? state.budgets.discretionary
+            : state.budgets.necessities
+        }
       />
       <EditStreakSheet
         open={state.sheet === "editStreak"}

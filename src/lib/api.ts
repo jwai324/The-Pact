@@ -119,7 +119,13 @@ export async function fetchAll(): Promise<DataSlice> {
     streak: a?.streak ?? 0,
     saved: a ? Number(a.saved) : 0,
     urgesSkipped: a?.urges_skipped ?? 0,
-    weeklyBudget: a ? Number(a.weekly_budget) : 125,
+    budgets: {
+      necessities: a?.necessities_budget != null ? Number(a.necessities_budget) : 100,
+      semiNecessities:
+        a?.semi_necessities_budget != null ? Number(a.semi_necessities_budget) : 50,
+      discretionary:
+        a?.discretionary_budget != null ? Number(a.discretionary_budget) : 50,
+    },
     lastLockedStakes: a ? Number(a.last_locked_stakes) : 0,
     badges: (a?.badges as string[]) ?? [],
     goals,
@@ -413,12 +419,19 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .eq("id", 1);
         return true;
       }
-      case "SET_BUDGET":
+      case "SET_BUDGET": {
+        const col =
+          action.category === "Necessities"
+            ? "necessities_budget"
+            : action.category === "Semi-necessities"
+            ? "semi_necessities_budget"
+            : "discretionary_budget";
         await supabase
           .from("app_state")
-          .update({ weekly_budget: action.amount })
+          .update({ [col]: action.amount })
           .eq("id", 1);
         return true;
+      }
       case "SET_STREAK":
         await supabase
           .from("app_state")

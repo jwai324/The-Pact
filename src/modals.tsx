@@ -10,7 +10,12 @@ import {
   Icon,
   StreakFlame,
 } from "./components/ui";
-import type { Action, Category, Goal } from "./state/types";
+import type {
+  Action,
+  Category,
+  Goal,
+  SpendCategory,
+} from "./state/types";
 
 type Dispatch = (a: Action) => void;
 
@@ -251,21 +256,25 @@ export const LogSpendSheet = ({
   open,
   onClose,
   dispatch,
+  defaultCategory,
 }: {
   open: boolean;
   onClose: () => void;
   dispatch: Dispatch;
+  defaultCategory?: SpendCategory;
 }) => {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [category, setCategory] = useState("Online");
+  const [category, setCategory] = useState<SpendCategory>(
+    defaultCategory ?? "Necessities"
+  );
   useEffect(() => {
     if (open) {
       setAmount("");
       setNote("");
-      setCategory("Online");
+      setCategory(defaultCategory ?? "Necessities");
     }
-  }, [open]);
+  }, [open, defaultCategory]);
   const submit = () => {
     if (!amount) return;
     dispatch({
@@ -276,13 +285,14 @@ export const LogSpendSheet = ({
     });
     onClose();
   };
-  const cats = [
-    { name: "Online", color: "var(--accent)" },
-    { name: "Clothes", color: "var(--magenta)" },
-    { name: "Dining", color: "var(--gold)" },
-    { name: "Beauty", color: "var(--purple)" },
-    { name: "Hobbies", color: "var(--teal)" },
-    { name: "Other", color: "var(--ink)" },
+  const cats: { name: SpendCategory; color: string; hint: string }[] = [
+    { name: "Necessities", color: "var(--teal)", hint: "food, shelter" },
+    {
+      name: "Semi-necessities",
+      color: "var(--purple)",
+      hint: "home repair, work supplies",
+    },
+    { name: "Discretionary", color: "var(--magenta)", hint: "movies, fun" },
   ];
   return (
     <Sheet open={open} onClose={onClose} title="Log purchase">
@@ -296,29 +306,46 @@ export const LogSpendSheet = ({
         />
       </Field>
       <Field label="Category">
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {cats.map((c) => (
-            <button
-              key={c.name}
-              onClick={() => setCategory(c.name)}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 999,
-                cursor: "pointer",
-                background: category === c.name ? c.color : "white",
-                color: category === c.name ? "white" : "var(--ink)",
-                border: `2px solid var(--ink)`,
-                boxShadow:
-                  category === c.name ? "2px 2px 0 var(--ink)" : "none",
-                fontFamily: "var(--body)",
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: "0.02em",
-              }}
-            >
-              {c.name}
-            </button>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {cats.map((c) => {
+            const active = category === c.name;
+            return (
+              <button
+                key={c.name}
+                onClick={() => setCategory(c.name)}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  background: active ? c.color : "white",
+                  color: active ? "white" : "var(--ink)",
+                  border: `2px solid var(--ink)`,
+                  boxShadow: active ? "2px 2px 0 var(--ink)" : "none",
+                  fontFamily: "var(--body)",
+                  fontWeight: 700,
+                  letterSpacing: "0.02em",
+                  textAlign: "left",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
+              >
+                <span style={{ fontSize: 14 }}>{c.name}</span>
+                <span
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    opacity: active ? 0.85 : 0.6,
+                  }}
+                >
+                  {c.hint}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </Field>
       <Field label="Note (optional)">
@@ -345,11 +372,13 @@ export const EditBudgetSheet = ({
   open,
   onClose,
   dispatch,
+  category,
   current,
 }: {
   open: boolean;
   onClose: () => void;
   dispatch: Dispatch;
+  category: SpendCategory;
   current: number;
 }) => {
   const [amount, setAmount] = useState(String(current));
@@ -358,19 +387,27 @@ export const EditBudgetSheet = ({
   }, [open, current]);
   const submit = () => {
     const n = Number(amount);
-    if (!amount || !Number.isFinite(n) || n <= 0) return;
-    dispatch({ type: "SET_BUDGET", amount: n });
+    if (!amount || !Number.isFinite(n) || n < 0) return;
+    dispatch({ type: "SET_BUDGET", category, amount: n });
     onClose();
   };
+  const hint =
+    category === "Necessities"
+      ? "food, shelter"
+      : category === "Semi-necessities"
+      ? "home repair, work supplies"
+      : "movies, fun";
   return (
-    <Sheet open={open} onClose={onClose} title="Weekly budget">
-      <Field label="How much can you spend each week?">
+    <Sheet open={open} onClose={onClose} title={`${category} budget`}>
+      <Field
+        label={`Weekly cap for ${category.toLowerCase()} (${hint})`}
+      >
         <Input
           value={amount}
           onChange={setAmount}
           prefix="$"
           inputMode="decimal"
-          placeholder="125"
+          placeholder="100"
         />
       </Field>
       <Button

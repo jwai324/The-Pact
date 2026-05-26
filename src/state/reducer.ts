@@ -8,7 +8,7 @@ export const emptyState = (): State => {
     streak: 0,
     saved: 0,
     urgesSkipped: 0,
-    weeklyBudget: 125,
+    budgets: { necessities: 100, semiNecessities: 50, discretionary: 50 },
     currentWeek: weekKey,
     currentWeekLabel: weekLabel,
     lastLockedStakes: 0,
@@ -156,8 +156,18 @@ export function reducer(state: State, action: Action): State {
         ...state,
         badges: Array.from(new Set([...state.badges, ...action.ids])),
       };
-    case "SET_BUDGET":
-      return { ...state, weeklyBudget: action.amount };
+    case "SET_BUDGET": {
+      const key =
+        action.category === "Necessities"
+          ? "necessities"
+          : action.category === "Semi-necessities"
+          ? "semiNecessities"
+          : "discretionary";
+      return {
+        ...state,
+        budgets: { ...state.budgets, [key]: action.amount },
+      };
+    }
     case "SET_STREAK":
       return { ...state, streak: action.value };
     case "SET_SAVED":
