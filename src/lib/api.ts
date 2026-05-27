@@ -1,9 +1,5 @@
 import { supabase } from "./supabase";
-import {
-  computeRelative,
-  currentWeek,
-  mergeWeeklyTrophies,
-} from "./helpers";
+import { computeRelative, mergeWeeklyTrophies } from "./helpers";
 import type { Rollover } from "./helpers";
 import type {
   Action,
@@ -164,7 +160,6 @@ export async function fetchAll(): Promise<DataSlice> {
       discretionary:
         a?.discretionary_budget != null ? Number(a.discretionary_budget) : 50,
     },
-    lastLockedStakes: a ? Number(a.last_locked_stakes) : 0,
     badges,
     activeTrophies,
     seenTrophies,
@@ -191,14 +186,32 @@ export async function fetchAll(): Promise<DataSlice> {
 // staleness can't drop these writes. Keys are written FIRST and the goals
 // update is filtered on status='Pending', so a partial failure or a
 // concurrent device re-running this is idempotent.
-export async function persistSweep(rollover: Rollover): Promise<boolean> {
+//
+// Also bumps `streak` by one when the just-ended week was clean (every active
+// Weekly quest was Pass). This took over for the deleted Lock-In ritual so
+// the streak-based trophies still progress automatically.
+export async function persistSweep(
+  rollover: Rollover,
+  prevData: Pick<DataSlice, "streak" | "goals">
+): Promise<boolean> {
   try {
+    let streakUpdate: number | null = null;
+    if (rollover.weekly) {
+      const weeklyActive = prevData.goals.filter(
+        (g) => g.category === "Weekly" && !g.future
+      );
+      const allPass =
+        weeklyActive.length > 0 &&
+        weeklyActive.every((g) => g.status === "Pass");
+      if (allPass) streakUpdate = prevData.streak + 1;
+    }
     await supabase
       .from("app_state")
       .update({
         last_week_key: rollover.newKeys.weekKey,
         last_month_key: rollover.newKeys.monthKey,
         last_quarter_key: rollover.newKeys.quarterKey,
+        ...(streakUpdate != null ? { streak: streakUpdate } : {}),
       })
       .eq("id", 1);
     const rolled: Category[] = [
@@ -267,31 +280,6 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
             .update({ saved: Math.max(0, prev.saved - Number(g.stake)) })
             .eq("id", 1);
         }
-        return true;
-      }
-      case "OPEN_LOCKIN": {
-        const weeklyStakes = prev.goals
-          .filter((g) => g.category === "Weekly" && g.status === "Pass")
-          .reduce((acc, b) => acc + Number(b.stake), 0);
-        await supabase
-          .from("app_state")
-          .update({ last_locked_stakes: weeklyStakes })
-          .eq("id", 1);
-        return true;
-      }
-      case "CLOSE_LOCKIN": {
-        // Lock-in resets all Weekly quests to Pending for the new week. Bump
-        // last_week_key in lockstep so the next load's sweep doesn't see
-        // these fresh Pending quests against a stale key and fail them.
-        await supabase
-          .from("app_state")
-          .update({ streak: prev.streak + 1, last_week_key: currentWeek().weekKey })
-          .eq("id", 1);
-        await supabase
-          .from("goals")
-          .update({ status: "Pending", relative: null })
-          .eq("category", "Weekly")
-          .eq("future", false);
         return true;
       }
       case "ADD_WANT": {

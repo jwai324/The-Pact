@@ -15,7 +15,6 @@ export const emptyState = (): State => {
     budgets: { necessities: 100, semiNecessities: 50, discretionary: 50 },
     currentWeek: weekKey,
     currentWeekLabel: weekLabel,
-    lastLockedStakes: 0,
     badges: {},
     activeTrophies: [],
     seenTrophies: [],
@@ -32,7 +31,6 @@ export const emptyState = (): State => {
     lastQuarterKey: null,
     sheet: null,
     sheetData: {},
-    lockInOpen: false,
     confettiKey: 0,
     loading: true,
   };
@@ -91,28 +89,6 @@ export function reducer(state: State, action: Action): State {
             ? { ...g, status: "Pending", relative: computeRelative(g.category) }
             : g
         ),
-      };
-    }
-    case "OPEN_LOCKIN": {
-      const weeklyStakes = state.goals
-        .filter((g) => g.category === "Weekly" && g.status === "Pass")
-        .reduce((a, b) => a + Number(b.stake), 0);
-      return { ...state, lockInOpen: true, lastLockedStakes: weeklyStakes };
-    }
-    case "CLOSE_LOCKIN": {
-      // Stakes are now credited to `saved` per pass (PASS_GOAL), so the weekly
-      // ritual no longer adds them again — it just advances the streak and
-      // rolls Weekly quests over for the new week.
-      return {
-        ...state,
-        lockInOpen: false,
-        streak: state.streak + 1,
-        goals: state.goals.map((g) =>
-          g.category === "Weekly"
-            ? { ...g, status: "Pending", relative: "due Sun" }
-            : g
-        ),
-        confettiKey: state.confettiKey + 1,
       };
     }
     case "ADD_WANT": {

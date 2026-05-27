@@ -77,7 +77,6 @@ export interface DataSlice {
   saved: number;
   urgesSkipped: number;
   budgets: SpendBudgets;
-  lastLockedStakes: number;
   // Trophy id -> number of times earned (cumulative; re-earnable). Display
   // only; never reflects current criteria once a count is recorded.
   badges: Record<string, number>;
@@ -117,7 +116,6 @@ export interface State extends DataSlice {
     goalId?: string;
     amount?: number;
   };
-  lockInOpen: boolean;
   confettiKey: number;
   loading: boolean;
 }
@@ -131,8 +129,6 @@ export type Action =
   | { type: "PASS_GOAL"; id: string }
   | { type: "FAIL_GOAL"; id: string }
   | { type: "RESET_GOAL"; id: string }
-  | { type: "OPEN_LOCKIN" }
-  | { type: "CLOSE_LOCKIN" }
   | { type: "ADD_WANT"; title: string; price: number | null; hours: number }
   | { type: "DECIDE_WANT"; id: string; decision: "skip" | "buy" }
   | { type: "ADD_GOAL"; title: string; category: Category; stake: number }

@@ -376,8 +376,7 @@ export const TodayTab = ({
   openSheet: OpenSheet;
 }) => {
   const weeklyGoals = state.goals.filter((g) => g.category === "Weekly");
-  const allPass =
-    weeklyGoals.every((g) => g.status === "Pass") && weeklyGoals.length > 0;
+  const activeWeeklyGoals = weeklyGoals.filter((g) => g.status === "Pending");
   const weeklySpent = state.spending
     .filter((s) => s.weekStart === state.currentWeek)
     .reduce((a, b) => a + b.amount, 0);
@@ -649,41 +648,13 @@ export const TodayTab = ({
         <div
           style={{ display: "flex", flexDirection: "column", gap: 14 }}
         >
-          {weeklyGoals.map((g, i) => (
+          {activeWeeklyGoals.map((g, i) => (
             <div key={g.id}>
               {i > 0 && <Divider style={{ marginBottom: 14 }} />}
               <GoalRow goal={g} dispatch={dispatch} compact />
             </div>
           ))}
         </div>
-        {allPass && (
-          <button
-            onClick={() => dispatch({ type: "OPEN_LOCKIN" })}
-            style={{
-              marginTop: 20,
-              height: 64,
-              width: "100%",
-              borderRadius: 16,
-              background: "var(--lime)",
-              color: "var(--ink)",
-              border: "2px solid var(--ink)",
-              fontFamily: "var(--display)",
-              fontSize: 22,
-              fontWeight: 700,
-              letterSpacing: "-0.01em",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              boxShadow: "5px 5px 0 var(--lime-deep)",
-              animation: "pulseGlow 1.6s ease-in-out infinite",
-            }}
-          >
-            <Icon name="lock" size={20} strokeWidth={2.5} color="var(--ink)" />{" "}
-            LOCK IN WEEK
-          </button>
-        )}
       </Card>
 
       {/* Stat tiles - colorful */}
@@ -2728,18 +2699,42 @@ export const TasksTab = ({
     .filter((t) => !t.done)
     .reduce((a, t) => a + (t.minutes || 0), 0);
 
-  const groupedGoals = state.goals
-    .filter((g) => filter === "All" || g.category === filter)
+  // Active groups: only Pending quests render in the top stack. Once a quest
+  // is Pass or Fail, its whole group migrates down to Task History (below).
+  const matchesFilter = (g: Goal) =>
+    filter === "All" || g.category === filter;
+
+  const activeGroupedGoals = state.goals
+    .filter((g) => matchesFilter(g) && g.status === "Pending")
     .map((g) => ({
       goal: g,
       tasks: state.tasks.filter((t) => t.goalId === g.id),
     }))
     .filter((group) => group.tasks.length > 0);
 
-  // Tasks not tied to any quest. They have no category, so they only show
-  // under "All".
-  const standaloneTasks =
-    filter === "All" ? state.tasks.filter((t) => !t.goalId) : [];
+  const historyGroupedGoals = state.goals
+    .filter((g) => matchesFilter(g) && g.status !== "Pending")
+    .map((g) => ({
+      goal: g,
+      tasks: state.tasks.filter((t) => t.goalId === g.id),
+    }))
+    .filter((group) => group.tasks.length > 0);
+
+  // Standalone tasks (no parent quest) have no category, so they only show
+  // under "All". Active = !done; done lands in Task History.
+  const activeStandalone =
+    filter === "All"
+      ? state.tasks.filter((t) => !t.goalId && !t.done)
+      : [];
+  const historyStandalone =
+    filter === "All" ? state.tasks.filter((t) => !t.goalId && t.done) : [];
+
+  const historyItems: { task: Task; parentTitle: string | null }[] = [
+    ...historyGroupedGoals.flatMap(({ goal, tasks }) =>
+      tasks.map((t) => ({ task: t, parentTitle: goal.title }))
+    ),
+    ...historyStandalone.map((t) => ({ task: t, parentTitle: null })),
+  ];
 
   return (
     <div
@@ -2846,7 +2841,9 @@ export const TasksTab = ({
       </Button>
 
       {/* Grouped tasks */}
-      {groupedGoals.length === 0 && standaloneTasks.length === 0 && (
+      {activeGroupedGoals.length === 0 &&
+        activeStandalone.length === 0 &&
+        historyItems.length === 0 && (
         <Card
           padded={false}
           style={{ padding: "32px 20px", textAlign: "center" }}
@@ -2875,9 +2872,11 @@ export const TasksTab = ({
         </Card>
       )}
 
-      {groupedGoals.map(({ goal, tasks }) => {
+      {activeGroupedGoals.map(({ goal, tasks }) => {
         const meta = CATEGORY_META[goal.category];
-        const done = tasks.filter((t) => t.done).length;
+        const pendingTasks = tasks.filter((t) => !t.done);
+        const doneTasks = tasks.filter((t) => t.done);
+        const done = doneTasks.length;
         return (
           <Card
             key={goal.id}
@@ -2951,7 +2950,7 @@ export const TasksTab = ({
             </div>
             {/* Task rows */}
             <div style={{ padding: "4px 18px" }}>
-              {tasks.map((t, i) => (
+              {pendingTasks.map((t, i) => (
                 <TaskRow
                   key={t.id}
                   task={t}
@@ -2959,6 +2958,7 @@ export const TasksTab = ({
                   first={i === 0}
                 />
               ))}
+              <CompletedTasksFooter tasks={doneTasks} dispatch={dispatch} />
               <div style={{ padding: "10px 0 14px" }}>
                 <button
                   onClick={() => openSheet("addTask", { goalId: goal.id })}
@@ -2990,7 +2990,7 @@ export const TasksTab = ({
         );
       })}
 
-      {standaloneTasks.length > 0 && (
+      {activeStandalone.length > 0 && (
         <Card padded={false} style={{ padding: 0, overflow: "hidden" }}>
           <div
             style={{
@@ -3033,12 +3033,11 @@ export const TasksTab = ({
                 whiteSpace: "nowrap",
               }}
             >
-              {standaloneTasks.filter((t) => t.done).length}/
-              {standaloneTasks.length}
+              {activeStandalone.length}
             </div>
           </div>
           <div style={{ padding: "4px 18px" }}>
-            {standaloneTasks.map((t, i) => (
+            {activeStandalone.map((t, i) => (
               <TaskRow
                 key={t.id}
                 task={t}
@@ -3049,7 +3048,134 @@ export const TasksTab = ({
           </div>
         </Card>
       )}
+
+      <TaskHistorySection items={historyItems} dispatch={dispatch} />
     </div>
+  );
+};
+
+// Collapsed "+ N completed" tail for an active quest group. Hides the done
+// tasks behind an expand toggle so the active list stays focused on what's
+// still open. Pure UI state — uses local useState.
+const CompletedTasksFooter = ({
+  tasks,
+  dispatch,
+}: {
+  tasks: Task[];
+  dispatch: Dispatch;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  if (tasks.length === 0) return null;
+  return (
+    <div style={{ padding: "4px 0 10px" }}>
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        style={{
+          background: "transparent",
+          border: "2px solid rgba(27,17,64,0.12)",
+          borderRadius: 10,
+          padding: "8px 12px",
+          cursor: "pointer",
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          fontWeight: 700,
+          color: "var(--ink-soft)",
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+        }}
+      >
+        {expanded ? `Hide ${tasks.length} completed` : `+ ${tasks.length} completed`}
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 4 }}>
+          {tasks.map((t, i) => (
+            <TaskRow
+              key={t.id}
+              task={t}
+              dispatch={dispatch}
+              first={i === 0}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Once a quest is completed (Pass or Fail), all of its tasks land here with
+// a pill referencing the parent quest. Standalone done tasks land here too
+// (no pill).
+const TaskHistorySection = ({
+  items,
+  dispatch,
+}: {
+  items: { task: Task; parentTitle: string | null }[];
+  dispatch: Dispatch;
+}) => {
+  if (items.length === 0) return null;
+  return (
+    <Card padded={false} style={{ padding: 0, overflow: "hidden" }}>
+      <div
+        style={{
+          background: "var(--ink)",
+          padding: "12px 18px",
+          color: "white",
+          borderBottom: "2px solid var(--ink)",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 9.5,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            opacity: 0.85,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Icon name="list" size={11} strokeWidth={2.4} />
+          Task History
+        </div>
+        <div
+          style={{
+            background: "white",
+            color: "var(--ink)",
+            border: "2px solid var(--ink)",
+            borderRadius: 999,
+            padding: "3px 10px",
+            fontFamily: "var(--mono)",
+            fontSize: 11,
+            fontWeight: 800,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {items.length}
+        </div>
+      </div>
+      <div style={{ padding: "4px 18px" }}>
+        {items.map(({ task, parentTitle }, i) => (
+          <TaskRow
+            key={task.id}
+            task={task}
+            dispatch={dispatch}
+            first={i === 0}
+            parentLabel={parentTitle ?? undefined}
+          />
+        ))}
+      </div>
+    </Card>
   );
 };
 
@@ -3057,10 +3183,12 @@ const TaskRow = ({
   task,
   dispatch,
   first,
+  parentLabel,
 }: {
   task: Task;
   dispatch: Dispatch;
   first: boolean;
+  parentLabel?: string;
 }) => {
   return (
     <div
@@ -3126,6 +3254,11 @@ const TaskRow = ({
             }}
           >
             ⏱ ~{task.minutes} MIN
+          </div>
+        )}
+        {parentLabel && (
+          <div style={{ marginTop: 6 }}>
+            <Pill tone="neutral">{parentLabel}</Pill>
           </div>
         )}
       </div>
