@@ -115,6 +115,13 @@ export const Icon = ({
         <path d="M10 21a2 2 0 0 0 4 0" />
       </>
     ),
+    bellOff: (
+      <>
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+        <path d="M10 21a2 2 0 0 0 4 0" />
+        <path d="M3 3l18 18" />
+      </>
+    ),
     download: (
       <>
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />

@@ -17,7 +17,15 @@ import {
   getLevel,
   formatCountdown,
 } from "./components/ui";
-import type { Action, Goal, State, Task, Want } from "./state/types";
+import type {
+  Action,
+  Goal,
+  SpendCategory,
+  State,
+  Task,
+  Want,
+} from "./state/types";
+import { SPEND_CATEGORIES } from "./state/types";
 import { TROPHIES, type Trophy } from "./lib/trophies";
 
 type Dispatch = (a: Action) => void;
@@ -373,6 +381,10 @@ export const TodayTab = ({
   const weeklySpent = state.spending
     .filter((s) => s.weekStart === state.currentWeek)
     .reduce((a, b) => a + b.amount, 0);
+  const totalBudget =
+    state.budgets.necessities +
+    state.budgets.semiNecessities +
+    state.budgets.discretionary;
   const owed = state.goals
     .filter((g) => g.status === "Fail" && !g.paid)
     .reduce((a, b) => a + Number(b.stake), 0);
@@ -701,16 +713,16 @@ export const TodayTab = ({
                 color: "var(--ink-soft)",
               }}
             >
-              /${state.weeklyBudget}
+              /${totalBudget}
             </span>
           </div>
           <ProgressBar
             value={weeklySpent}
-            max={state.weeklyBudget}
+            max={totalBudget}
             color={
-              weeklySpent > state.weeklyBudget
+              weeklySpent > totalBudget
                 ? "var(--red)"
-                : weeklySpent > state.weeklyBudget * 0.8
+                : weeklySpent > totalBudget * 0.8
                 ? "var(--gold)"
                 : "var(--teal)"
             }
@@ -1323,11 +1335,30 @@ export const FutureQuestsTab = ({
       variant: "danger",
     },
     {
-      key: "budget",
-      label: "Spending max",
-      value: `$${state.weeklyBudget.toLocaleString()}`,
+      key: "budget-necessities",
+      label: "Necessities budget",
+      value: `$${state.budgets.necessities.toLocaleString()}/wk`,
       action: "Edit",
-      onClick: () => openSheet("editBudget"),
+      onClick: () =>
+        openSheet("editBudget", { spendCategory: "Necessities" }),
+      variant: "purple",
+    },
+    {
+      key: "budget-semi",
+      label: "Semi-necessities budget",
+      value: `$${state.budgets.semiNecessities.toLocaleString()}/wk`,
+      action: "Edit",
+      onClick: () =>
+        openSheet("editBudget", { spendCategory: "Semi-necessities" }),
+      variant: "purple",
+    },
+    {
+      key: "budget-discretionary",
+      label: "Discretionary budget",
+      value: `$${state.budgets.discretionary.toLocaleString()}/wk`,
+      action: "Edit",
+      onClick: () =>
+        openSheet("editBudget", { spendCategory: "Discretionary" }),
       variant: "purple",
     },
   ];
@@ -2082,6 +2113,43 @@ const WantRow = ({
 };
 
 // ─────────────────────────────────────────────────────────────
+// Normalize legacy spend rows (which carried sub-categories like Online,
+// Dining, Beauty) into one of the three buckets so old data still shows up
+// under a sensible tab instead of disappearing.
+const normalizeSpendCategory = (raw: string): SpendCategory => {
+  if (
+    raw === "Necessities" ||
+    raw === "Semi-necessities" ||
+    raw === "Discretionary"
+  )
+    return raw;
+  return "Discretionary";
+};
+
+const BUDGET_BY_CAT: Record<SpendCategory, keyof State["budgets"]> = {
+  Necessities: "necessities",
+  "Semi-necessities": "semiNecessities",
+  Discretionary: "discretionary",
+};
+
+const CAT_COLOR: Record<SpendCategory, string> = {
+  Necessities: "var(--teal)",
+  "Semi-necessities": "var(--purple)",
+  Discretionary: "var(--magenta)",
+};
+
+const CAT_PILL: Record<SpendCategory, "teal" | "purple" | "magenta"> = {
+  Necessities: "teal",
+  "Semi-necessities": "purple",
+  Discretionary: "magenta",
+};
+
+const CAT_SOFT: Record<SpendCategory, string> = {
+  Necessities: "var(--teal-soft)",
+  "Semi-necessities": "var(--paper-deep)",
+  Discretionary: "var(--paper-deep)",
+};
+
 export const SpendTab = ({
   state,
   dispatch,
@@ -2091,19 +2159,32 @@ export const SpendTab = ({
   dispatch: Dispatch;
   openSheet: OpenSheet;
 }) => {
+  const [active, setActive] = useState<SpendCategory>("Necessities");
+
   const weekTx = state.spending.filter(
     (s) => s.weekStart === state.currentWeek
   );
-  const total = weekTx.reduce((a, b) => a + b.amount, 0);
-  const pct = total / state.weeklyBudget;
+  const byCat: Record<SpendCategory, typeof weekTx> = {
+    Necessities: [],
+    "Semi-necessities": [],
+    Discretionary: [],
+  };
+  for (const tx of weekTx) {
+    byCat[normalizeSpendCategory(tx.category)].push(tx);
+  }
+
+  const budget = state.budgets[BUDGET_BY_CAT[active]];
+  const activeTx = byCat[active];
+  const total = activeTx.reduce((a, b) => a + b.amount, 0);
+  const pct = budget > 0 ? total / budget : 0;
   const barColor =
-    pct > 1 ? "var(--red)" : pct > 0.8 ? "var(--gold)" : "var(--teal)";
+    pct > 1 ? "var(--red)" : pct > 0.8 ? "var(--gold)" : CAT_COLOR[active];
   const heroBg =
     pct > 1
       ? "var(--red-soft)"
       : pct > 0.8
       ? "var(--gold-soft)"
-      : "var(--teal-soft)";
+      : CAT_SOFT[active];
 
   return (
     <div
@@ -2114,33 +2195,20 @@ export const SpendTab = ({
         gap: 16,
       }}
     >
+      <SegmentedControl
+        options={SPEND_CATEGORIES.map((c) => ({
+          value: c,
+          label: c === "Semi-necessities" ? "Semi-nec" : c,
+        }))}
+        value={active}
+        onChange={(v) => setActive(v as SpendCategory)}
+      />
+
       <Card padded={false} color={heroBg} style={{ padding: "24px 22px" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <Eyebrow>Week of {state.currentWeekLabel}</Eyebrow>
-          <button
-            onClick={() => openSheet("editBudget")}
-            aria-label="Edit weekly budget"
-            style={{
-              background: "white",
-              border: "2px solid var(--ink)",
-              borderRadius: 999,
-              padding: "4px 10px",
-              fontFamily: "var(--mono)",
-              fontSize: 10,
-              fontWeight: 700,
-              cursor: "pointer",
-              letterSpacing: "0.04em",
-            }}
-          >
-            EDIT
-          </button>
+        <div style={{ marginBottom: 12 }}>
+          <Eyebrow>
+            {active} · week of {state.currentWeekLabel}
+          </Eyebrow>
         </div>
         <div
           style={{
@@ -2171,12 +2239,12 @@ export const SpendTab = ({
               fontWeight: 600,
             }}
           >
-            /${state.weeklyBudget}
+            /${budget}
           </span>
         </div>
         <ProgressBar
           value={total}
-          max={state.weeklyBudget}
+          max={Math.max(budget, 1)}
           color={barColor}
           height={14}
         />
@@ -2193,7 +2261,7 @@ export const SpendTab = ({
         >
           {pct > 1
             ? `🔥 ${Math.round((pct - 1) * 100)}% OVER`
-            : `${(state.weeklyBudget - total).toFixed(2)} LEFT`}
+            : `${(budget - total).toFixed(2)} LEFT`}
         </div>
       </Card>
 
@@ -2201,7 +2269,7 @@ export const SpendTab = ({
         variant="lime"
         fullWidth
         size="lg"
-        onClick={() => openSheet("logSpend")}
+        onClick={() => openSheet("logSpend", { spendCategory: active })}
       >
         <Icon name="plus" size={18} strokeWidth={2.6} color="var(--ink)" /> Log
         a purchase
@@ -2209,10 +2277,10 @@ export const SpendTab = ({
 
       <div>
         <Eyebrow style={{ marginBottom: 12, paddingLeft: 4 }}>
-          This week · {weekTx.length}
+          {active} this week · {activeTx.length}
         </Eyebrow>
         <Card padded={false} style={{ padding: "4px 22px" }}>
-          {weekTx.length === 0 && (
+          {activeTx.length === 0 && (
             <div
               style={{
                 padding: "20px 0",
@@ -2222,100 +2290,87 @@ export const SpendTab = ({
                 color: "var(--ink-soft)",
               }}
             >
-              No purchases logged.
+              No {active.toLowerCase()} purchases logged.
             </div>
           )}
-          {weekTx.map((tx, i) => (
-            <div
-              key={tx.id}
-              style={{
-                padding: "16px 0",
-                borderTop:
-                  i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                  }}
-                >
-                  {tx.note || tx.category || "Purchase"}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
-                    marginTop: 6,
-                  }}
-                >
-                  {tx.category && (
-                    <Pill
-                      tone={
-                        tx.category === "Online"
-                          ? "accent"
-                          : tx.category === "Clothes"
-                          ? "magenta"
-                          : tx.category === "Dining"
-                          ? "gold"
-                          : tx.category === "Beauty"
-                          ? "purple"
-                          : tx.category === "Hobbies"
-                          ? "teal"
-                          : "neutral"
-                      }
-                    >
-                      {tx.category}
-                    </Pill>
-                  )}
-                  <span
+          {activeTx.map((tx, i) => {
+            const cat = normalizeSpendCategory(tx.category);
+            return (
+              <div
+                key={tx.id}
+                style={{
+                  padding: "16px 0",
+                  borderTop:
+                    i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div
                     style={{
-                      fontFamily: "var(--mono)",
-                      fontSize: 11,
-                      color: "var(--ink-soft)",
+                      fontSize: 15,
                       fontWeight: 600,
+                      color: "var(--ink)",
                     }}
                   >
-                    {tx.dayLabel}
-                  </span>
+                    {tx.note || tx.category || "Purchase"}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      marginTop: 6,
+                    }}
+                  >
+                    <Pill tone={CAT_PILL[cat]}>{cat}</Pill>
+                    <span
+                      style={{
+                        fontFamily: "var(--mono)",
+                        fontSize: 11,
+                        color: "var(--ink-soft)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {tx.dayLabel}
+                    </span>
+                  </div>
+                </div>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 10 }}
+                >
+                  <Money amount={tx.amount} size={18} weight={700} />
+                  <button
+                    onClick={() =>
+                      dispatch({ type: "DELETE_SPEND", id: tx.id })
+                    }
+                    aria-label={`Delete purchase: ${
+                      tx.note || tx.category || "Purchase"
+                    }`}
+                    style={{
+                      flexShrink: 0,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 7,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--ink-soft)",
+                      opacity: 0.5,
+                      padding: 0,
+                    }}
+                  >
+                    <Icon name="x" size={13} strokeWidth={2.4} />
+                  </button>
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Money amount={tx.amount} size={18} weight={700} />
-                <button
-                  onClick={() =>
-                    dispatch({ type: "DELETE_SPEND", id: tx.id })
-                  }
-                  aria-label={`Delete purchase: ${
-                    tx.note || tx.category || "Purchase"
-                  }`}
-                  style={{
-                    flexShrink: 0,
-                    width: 24,
-                    height: 24,
-                    borderRadius: 7,
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "var(--ink-soft)",
-                    opacity: 0.5,
-                    padding: 0,
-                  }}
-                >
-                  <Icon name="x" size={13} strokeWidth={2.4} />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </Card>
       </div>
     </div>

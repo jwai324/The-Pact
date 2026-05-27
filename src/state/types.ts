@@ -2,6 +2,25 @@ export type Category = "Weekly" | "Monthly" | "Quarterly" | "Side";
 export type GoalStatus = "Pass" | "Fail" | "Pending";
 export type Decision = "skip" | "buy" | null;
 
+// The three spending buckets: Necessities (food, shelter),
+// Semi-necessities (home repair, work supplies), and Discretionary (movies).
+export type SpendCategory =
+  | "Necessities"
+  | "Semi-necessities"
+  | "Discretionary";
+
+export const SPEND_CATEGORIES: SpendCategory[] = [
+  "Necessities",
+  "Semi-necessities",
+  "Discretionary",
+];
+
+export interface SpendBudgets {
+  necessities: number;
+  semiNecessities: number;
+  discretionary: number;
+}
+
 export interface Goal {
   id: string;
   title: string;
@@ -57,7 +76,7 @@ export interface DataSlice {
   streak: number;
   saved: number;
   urgesSkipped: number;
-  weeklyBudget: number;
+  budgets: SpendBudgets;
   lastLockedStakes: number;
   // Trophy id -> number of times earned (cumulative; re-earnable). Display
   // only; never reflects current criteria once a count is recorded.
@@ -92,7 +111,12 @@ export interface State extends DataSlice {
   currentWeek: string;
   currentWeekLabel: string;
   sheet: string | null;
-  sheetData: { category?: Category; goalId?: string; amount?: number };
+  sheetData: {
+    category?: Category;
+    spendCategory?: SpendCategory;
+    goalId?: string;
+    amount?: number;
+  };
   lockInOpen: boolean;
   confettiKey: number;
   loading: boolean;
@@ -134,7 +158,7 @@ export type Action =
   | { type: "ADD_BADGE"; id: string }
   | { type: "REMOVE_BADGE"; id: string }
   | { type: "SEE_TROPHY"; id: string }
-  | { type: "SET_BUDGET"; amount: number }
+  | { type: "SET_BUDGET"; category: SpendCategory; amount: number }
   | { type: "SET_STREAK"; value: number }
   | { type: "SET_SAVED"; value: number }
   | { type: "LOG_PAYMENT"; amount: number; note: string; proofUrl: string };
