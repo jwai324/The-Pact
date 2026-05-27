@@ -1,5 +1,9 @@
 import type { State, Action, Goal } from "./types";
-import { computeRelative, currentWeek } from "../lib/helpers";
+import {
+  computeRelative,
+  currentWeek,
+  mergeWeeklyTrophies,
+} from "../lib/helpers";
 
 export const emptyState = (): State => {
   const { weekKey, weekLabel } = currentWeek();
@@ -8,11 +12,15 @@ export const emptyState = (): State => {
     streak: 0,
     saved: 0,
     urgesSkipped: 0,
-    weeklyBudget: 125,
+    budgets: { necessities: 100, semiNecessities: 50, discretionary: 50 },
     currentWeek: weekKey,
     currentWeekLabel: weekLabel,
     lastLockedStakes: 0,
-    badges: [],
+    badges: {},
+    activeTrophies: [],
+    seenTrophies: [],
+    weeklyTrophies: [],
+    weeklyTrophyWeek: null,
     goals: [],
     futureGoals: [],
     tasks: [],
@@ -55,6 +63,9 @@ export function reducer(state: State, action: Action): State {
           g.id === action.id
             ? { ...g, status: "Pass", relative: "passed today" }
             : g
+        ),
+        tasks: state.tasks.map((t) =>
+          t.goalId === action.id && !t.done ? { ...t, done: true } : t
         ),
         confettiKey: state.confettiKey + 1,
       };
@@ -151,13 +162,78 @@ export function reducer(state: State, action: Action): State {
         wants: state.wants.filter((w) => !w.decision),
         urgesSkipped: 0,
       };
-    case "AWARD_BADGES":
+    case "AWARD_BADGES": {
+      // ids = trophies that just transitioned not-met -> met (each bumps its
+      // lifetime count). active = the full currently-met set, stored so the
+      // next evaluation can tell a fresh earn from a still-held one.
+      const badges = { ...state.badges };
+      for (const id of action.ids) badges[id] = (badges[id] ?? 0) + 1;
+      const weekly = mergeWeeklyTrophies(
+        state.weeklyTrophies,
+        state.weeklyTrophyWeek,
+        action.ids
+      );
       return {
         ...state,
-        badges: Array.from(new Set([...state.badges, ...action.ids])),
+        badges,
+        activeTrophies: action.active,
+        weeklyTrophies: weekly.ids,
+        weeklyTrophyWeek: weekly.week,
       };
-    case "SET_BUDGET":
-      return { ...state, weeklyBudget: action.amount };
+    }
+    case "ADD_BADGE": {
+      // Manual earn (hidden Future Quests screen). Bumps the lifetime count
+      // only; activeTrophies is left to the evaluator (badges isn't an
+      // evaluator dep, so this won't trigger a re-award).
+      const badges = { ...state.badges };
+      badges[action.id] = (badges[action.id] ?? 0) + 1;
+      const weekly = mergeWeeklyTrophies(
+        state.weeklyTrophies,
+        state.weeklyTrophyWeek,
+        [action.id]
+      );
+      return {
+        ...state,
+        badges,
+        weeklyTrophies: weekly.ids,
+        weeklyTrophyWeek: weekly.week,
+      };
+    }
+    case "REMOVE_BADGE": {
+      // Manual un-earn: decrement by one, dropping the key at zero so the
+      // cabinet reads it as locked. Once fully un-earned, forget it was seen
+      // so a future re-earn shows the "new" stamp again.
+      const badges = { ...state.badges };
+      const next = (badges[action.id] ?? 0) - 1;
+      if (next > 0) badges[action.id] = next;
+      else delete badges[action.id];
+      const seenTrophies =
+        next > 0
+          ? state.seenTrophies
+          : state.seenTrophies.filter((x) => x !== action.id);
+      const weeklyTrophies =
+        next > 0
+          ? state.weeklyTrophies
+          : state.weeklyTrophies.filter((x) => x !== action.id);
+      return { ...state, badges, seenTrophies, weeklyTrophies };
+    }
+    case "SEE_TROPHY":
+      // The user opened this trophy's detail — clear its "new" stamp.
+      return state.seenTrophies.includes(action.id)
+        ? state
+        : { ...state, seenTrophies: [...state.seenTrophies, action.id] };
+    case "SET_BUDGET": {
+      const key =
+        action.category === "Necessities"
+          ? "necessities"
+          : action.category === "Semi-necessities"
+          ? "semiNecessities"
+          : "discretionary";
+      return {
+        ...state,
+        budgets: { ...state.budgets, [key]: action.amount },
+      };
+    }
     case "SET_STREAK":
       return { ...state, streak: action.value };
     case "SET_SAVED":

@@ -2,7 +2,7 @@
 // removed, in-memory seed replaced with Supabase-backed store).
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePactStore } from "./state/store";
-import type { Category, State } from "./state/types";
+import type { Category, SpendCategory, State } from "./state/types";
 import { Icon, Eyebrow, Display, Confetti } from "./components/ui";
 import { TrophyReveal } from "./components/TrophyReveal";
 import {
@@ -18,6 +18,7 @@ import {
   SpendTab,
   PactTab,
   FutureQuestsTab,
+  TrophiesTab,
 } from "./tabs";
 import {
   AddWantSheet,
@@ -36,59 +37,49 @@ export default function App() {
   const [state, dispatch] = usePactStore();
   const [now, setNow] = useState(Date.now());
 
-  // Notification preference. Device/browser-specific (tied to the OS-level
-  // permission), so it lives in localStorage rather than the synced store.
-  // Stored "on" only counts if the browser permission is still granted —
-  // so revoking it in browser settings reconciles back to off on next load.
-  const [notifOn, setNotifOn] = useState<boolean>(() => {
+  // Browser notification permission lives in the browser, not the synced
+  // store — it is per-device and can't be re-prompted once decided.
+  const [notifPerm, setNotifPerm] = useState<
+    NotificationPermission | "unsupported"
+  >(() =>
+    typeof window !== "undefined" && "Notification" in window
+      ? Notification.permission
+      : "unsupported"
+  );
+  // App-level on/off switch layered over the browser permission, which the
+  // Notifications API won't let us revoke programmatically. Turning it off
+  // mutes notifications while leaving the granted permission untouched.
+  // Persisted per device since, like the permission, it isn't synced state.
+  const [notifEnabled, setNotifEnabled] = useState<boolean>(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("thepact:notifEnabled") !== "false"
+  );
+  const notifOn = notifPerm === "granted" && notifEnabled;
+  const setNotifPref = (on: boolean) => {
+    setNotifEnabled(on);
     try {
-      if (localStorage.getItem("pact:notifications") !== "on") return false;
-      return (
-        typeof Notification !== "undefined" &&
-        Notification.permission === "granted"
-      );
+      window.localStorage.setItem("thepact:notifEnabled", String(on));
     } catch {
-      return false;
+      // Storage disabled (e.g. private mode) — in-memory state still applies.
     }
-  });
-
+  };
   const toggleNotifications = async () => {
-    const setPref = (on: boolean) => {
-      setNotifOn(on);
-      try {
-        localStorage.setItem("pact:notifications", on ? "on" : "off");
-      } catch {
-        /* storage unavailable — keep the in-memory toggle only */
-      }
-    };
-
+    if (notifPerm === "unsupported" || notifPerm === "denied") return;
     if (notifOn) {
-      setPref(false);
+      setNotifPref(false);
       return;
     }
-    if (typeof Notification === "undefined") return;
-
-    let perm = Notification.permission;
-    if (perm === "default") {
-      try {
-        perm = await Notification.requestPermission();
-      } catch {
-        perm = Notification.permission;
-      }
+    if (notifPerm !== "granted") {
+      // Resolves immediately if already decided; only prompts while "default".
+      const result = await Notification.requestPermission();
+      setNotifPerm(result);
+      if (result !== "granted") return;
     }
-    if (perm === "granted") {
-      setPref(true);
-      try {
-        new Notification("The Pact", {
-          body: "Notifications are on — we'll nudge you about your pact.",
-        });
-      } catch {
-        /* some browsers block construction outside a SW; toggle still on */
-      }
-    } else {
-      // Denied/blocked: can't enable programmatically, stay off.
-      setPref(false);
-    }
+    setNotifPref(true);
+    new Notification("The Pact", {
+      body: "Notifications enabled — you're all set. 🔔",
+    });
   };
 
   // Easter egg: 5 taps on the home greeting opens the hidden Future Quests
@@ -109,18 +100,23 @@ export default function App() {
     }, 1500);
   };
 
-  // Auto-award trophies as criteria are met, persist them, and queue a
-  // reveal for any unlocked *after* the first load — so a backlog from a
-  // fresh/legacy badge list is backfilled silently, not as 8 animations.
+  // Trophies are re-earnable: each not-met -> met transition bumps a lifetime
+  // count. `activeTrophies` is the currently-met set from the last pass; a
+  // trophy missing from it but met now is a fresh earn. We also resync when a
+  // trophy lapses (met -> not-met) so it can be counted again later. Reveals
+  // only fire post-seed, so a legacy backlog backfills silently.
   const trophySeeded = useRef(false);
   const [revealQueue, setRevealQueue] = useState<Trophy[]>([]);
   useEffect(() => {
     if (state.loading) return;
     const met = evaluateTrophies(state);
-    const newly = met.filter((id) => !state.badges.includes(id));
-    if (newly.length) {
-      dispatch({ type: "AWARD_BADGES", ids: newly });
-      if (trophySeeded.current) {
+    const active = state.activeTrophies;
+    const newly = met.filter((id) => !active.includes(id));
+    const changed =
+      newly.length > 0 || active.some((id) => !met.includes(id));
+    if (changed) {
+      dispatch({ type: "AWARD_BADGES", ids: newly, active: met });
+      if (trophySeeded.current && newly.length) {
         const ts = newly
           .map((id) => TROPHIES.find((t) => t.id === id))
           .filter((t): t is Trophy => !!t);
@@ -135,9 +131,12 @@ export default function App() {
     state.urgesSkipped,
     state.wants,
     state.goals,
+    state.futureGoals,
     state.spending,
     state.currentWeek,
-    state.badges,
+    state.tasks,
+    state.payments,
+    state.activeTrophies,
     dispatch,
   ]);
 
@@ -188,6 +187,7 @@ export default function App() {
         openSheet={openSheet}
       />
     ),
+    trophies: <TrophiesTab state={state} dispatch={dispatch} />,
   };
 
   // Live date for the header eyebrows (re-derived from `now`, which ticks
@@ -215,6 +215,7 @@ export default function App() {
     spend: { eyebrow: `${dateLabel} · RESETS MON`, title: "Spending" },
     pact: { eyebrow: "WITH JUSTIN WAI", title: "The Pact" },
     future: { eyebrow: "HIDDEN · THE STASH", title: "Future Quests" },
+    trophies: { eyebrow: "THE TROPHY CABINET", title: "Trophies" },
   };
 
   return (
@@ -263,34 +264,41 @@ export default function App() {
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
+              type="button"
               onClick={toggleNotifications}
-              aria-pressed={notifOn}
               aria-label={
-                notifOn ? "Turn notifications off" : "Turn notifications on"
+                notifOn
+                  ? "Turn off notifications"
+                  : "Turn on notifications"
               }
+              aria-pressed={notifOn}
               title={
-                notifOn ? "Notifications on" : "Notifications off"
+                notifOn
+                  ? "Notifications on — tap to turn off"
+                  : notifPerm === "denied"
+                  ? "Notifications blocked — enable them in your browser settings"
+                  : notifPerm === "unsupported"
+                  ? "Notifications not supported in this browser"
+                  : "Tap to turn on notifications"
               }
               style={{
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: notifOn ? "var(--accent)" : "white",
+                background: notifOn ? "var(--lime)" : "white",
                 border: "2px solid var(--ink)",
                 boxShadow: "2px 2px 0 var(--ink)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                cursor: "pointer",
                 padding: 0,
+                cursor:
+                  notifPerm === "unsupported" || notifPerm === "denied"
+                    ? "default"
+                    : "pointer",
               }}
             >
-              <Icon
-                name={notifOn ? "bell" : "bellOff"}
-                size={16}
-                color={notifOn ? "white" : "var(--ink)"}
-                strokeWidth={2.4}
-              />
+              <Icon name="bell" size={16} color="var(--ink)" strokeWidth={2.4} />
             </button>
             <div
               style={{
@@ -455,12 +463,22 @@ export default function App() {
         open={state.sheet === "logSpend"}
         onClose={closeSheet}
         dispatch={dispatch}
+        defaultCategory={state.sheetData.spendCategory}
       />
       <EditBudgetSheet
         open={state.sheet === "editBudget"}
         onClose={closeSheet}
         dispatch={dispatch}
-        current={state.weeklyBudget}
+        category={
+          (state.sheetData.spendCategory as SpendCategory) ?? "Necessities"
+        }
+        current={
+          state.sheetData.spendCategory === "Semi-necessities"
+            ? state.budgets.semiNecessities
+            : state.sheetData.spendCategory === "Discretionary"
+            ? state.budgets.discretionary
+            : state.budgets.necessities
+        }
       />
       <EditStreakSheet
         open={state.sheet === "editStreak"}
