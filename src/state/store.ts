@@ -20,7 +20,7 @@ export function usePactStore() {
       // a failed/partial sweep just self-heals on the next open.
       const rollover = detectRollover(data, currentKeys());
       if (rollover.changed) {
-        await persistSweep(rollover);
+        await persistSweep(rollover, data);
         data = await fetchAll();
       }
       rawDispatch({ type: "HYDRATE", data });

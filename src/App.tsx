@@ -30,7 +30,6 @@ import {
   EditStreakSheet,
   EditSavedSheet,
   LogPaymentSheet,
-  LockInOverlay,
 } from "./modals";
 
 export default function App() {
@@ -497,12 +496,6 @@ export default function App() {
         onClose={closeSheet}
         dispatch={dispatch}
         suggestedAmount={state.sheetData.amount}
-      />
-      <LockInOverlay
-        open={state.lockInOpen}
-        stakes={state.lastLockedStakes}
-        weeks={state.streak + 1}
-        onClose={() => dispatch({ type: "CLOSE_LOCKIN" })}
       />
 
       <Confetti trigger={state.confettiKey} />
