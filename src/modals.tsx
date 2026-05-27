@@ -125,13 +125,21 @@ export const AddGoalSheet = ({
           ? 50
           : defaultCategory === "Monthly"
           ? 100
+          : defaultCategory === "Side"
+          ? 0
           : 150
       );
     }
   }, [open, defaultCategory]);
   useEffect(() => {
     setStake(
-      category === "Weekly" ? 50 : category === "Monthly" ? 100 : 150
+      category === "Weekly"
+        ? 50
+        : category === "Monthly"
+        ? 100
+        : category === "Side"
+        ? 0
+        : 150
     );
   }, [category]);
   const submit = () => {
@@ -162,7 +170,7 @@ export const AddGoalSheet = ({
       </Field>
       <Field label="Category">
         <SegmentedControl
-          options={["Weekly", "Monthly", "Quarterly"]}
+          options={["Weekly", "Monthly", "Quarterly", "Side"]}
           value={category}
           onChange={(v) => setCategory(v as Category)}
         />
@@ -806,19 +814,21 @@ export const AddTaskSheet = ({
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState(15);
   const eligible = goals.filter((g) => g.status !== "Pass");
-  const [goalId, setGoalId] = useState(
-    defaultGoalId || (eligible[0] && eligible[0].id) || ""
-  );
+  // null = standalone task (no quest). Defaults to the first eligible quest
+  // when one exists, otherwise standalone so a task is always creatable.
+  const initialGoal = (): string | null =>
+    defaultGoalId ?? (eligible[0]?.id ?? null);
+  const [goalId, setGoalId] = useState<string | null>(initialGoal);
   useEffect(() => {
     if (open) {
       setTitle("");
       setMinutes(15);
-      setGoalId(defaultGoalId || (eligible[0] && eligible[0].id) || "");
+      setGoalId(initialGoal());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultGoalId]);
   const submit = () => {
-    if (!title.trim() || !goalId) return;
+    if (!title.trim()) return;
     dispatch({
       type: "ADD_TASK",
       goalId,
@@ -848,10 +858,10 @@ export const AddTaskSheet = ({
           fontWeight: 500,
         }}
       >
-        A small concrete step. Pick the quest it belongs to.
+        A small concrete step. Tie it to a quest, or keep it standalone.
       </div>
 
-      <Field label="Belongs to which quest">
+      <Field label="Belongs to which quest (optional)">
         <div
           style={{
             display: "flex",
@@ -862,6 +872,31 @@ export const AddTaskSheet = ({
             paddingRight: 4,
           }}
         >
+          <button
+            onClick={() => setGoalId(null)}
+            style={{
+              textAlign: "left",
+              padding: "10px 12px",
+              background: goalId === null ? "var(--ink)" : "white",
+              color: goalId === null ? "white" : "var(--ink)",
+              border: "2px solid var(--ink)",
+              borderRadius: 10,
+              boxShadow:
+                goalId === null ? "none" : "2px 2px 0 var(--ink)",
+              transform:
+                goalId === null
+                  ? "translate(2px,2px)"
+                  : "translate(0,0)",
+              fontFamily: "var(--body)",
+              fontSize: 13.5,
+              fontWeight: 600,
+              lineHeight: 1.3,
+              cursor: "pointer",
+              transition: "transform 0.06s, box-shadow 0.06s",
+            }}
+          >
+            No quest · standalone task
+          </button>
           {groupOrder.map((cat) => {
             const inCat = eligible.filter((g) => g.category === cat);
             if (inCat.length === 0) return null;

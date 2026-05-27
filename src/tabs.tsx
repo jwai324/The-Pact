@@ -31,6 +31,341 @@ import { TROPHIES, type Trophy } from "./lib/trophies";
 type Dispatch = (a: Action) => void;
 type OpenSheet = (sheet: string, data?: State["sheetData"]) => void;
 
+// Deterministic shuffle seeded by an integer (mulberry32). Same seed -> same
+// order, so the home page's random unearned picks stay stable within a day.
+const seededShuffle = <T,>(arr: T[], seed: number): T[] => {
+  let s = seed >>> 0;
+  const rand = () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const isNewTrophy = (
+  t: Trophy,
+  badges: Record<string, number>,
+  seen: string[]
+) => (badges[t.id] ?? 0) > 0 && !seen.includes(t.id);
+
+// Shared trophy grid. Renders the given trophies (defaults to all) so the
+// home preview and the full Trophies page look and behave identically.
+const TrophyGrid = ({
+  badges,
+  seen,
+  onSelect,
+  trophies = TROPHIES,
+}: {
+  badges: Record<string, number>;
+  seen: string[];
+  onSelect: (t: Trophy) => void;
+  trophies?: Trophy[];
+}) => (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(4, 1fr)",
+      gap: 10,
+    }}
+  >
+    {trophies.map((t) => {
+      const count = badges[t.id] ?? 0;
+      const earned = count > 0;
+      const isNew = isNewTrophy(t, badges, seen);
+      return (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onSelect(t)}
+          aria-label={`${t.name}${
+            earned
+              ? ` (earned${count > 1 ? ` ${count} times` : ""}${
+                  isNew ? ", new" : ""
+                })`
+              : " — how to earn"
+          }`}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 4,
+            opacity: earned ? 1 : 0.32,
+            filter: earned ? "none" : "grayscale(0.5)",
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            font: "inherit",
+          }}
+        >
+          <div
+            id={`trophy-slot-${t.id}`}
+            style={{
+              position: "relative",
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: earned ? t.color : "white",
+              border: "2px solid var(--ink)",
+              boxShadow: earned ? "2px 2px 0 var(--ink)" : "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {isNew && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -8,
+                  left: -8,
+                  padding: "0 5px",
+                  height: 16,
+                  borderRadius: 8,
+                  background: "var(--red)",
+                  color: "white",
+                  border: "2px solid white",
+                  fontFamily: "var(--mono)",
+                  fontSize: 8,
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  lineHeight: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                NEW
+              </span>
+            )}
+            {count > 1 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -7,
+                  right: -7,
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 4px",
+                  borderRadius: 9,
+                  background: "var(--ink)",
+                  color: "white",
+                  border: "2px solid white",
+                  fontFamily: "var(--mono)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  lineHeight: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                ×{count}
+              </span>
+            )}
+            <Icon
+              name={t.icon}
+              size={22}
+              color={earned ? "white" : "var(--ink)"}
+              strokeWidth={2.2}
+            />
+          </div>
+          <span
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 9.5,
+              color: "var(--ink)",
+              fontWeight: 600,
+              letterSpacing: "0.02em",
+              textAlign: "center",
+            }}
+          >
+            {t.name}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+);
+
+// Shared "how to earn it" detail sheet — opened by tapping any trophy in
+// either the home cabinet or the Trophies page.
+const TrophyDetailSheet = ({
+  trophy,
+  count,
+  onClose,
+}: {
+  trophy: Trophy | null;
+  count: number;
+  onClose: () => void;
+}) => (
+  <Sheet
+    open={!!trophy}
+    onClose={onClose}
+    title={trophy ? `${trophy.name} ${count > 0 ? "🏆" : "🔒"}` : ""}
+  >
+    {trophy && (
+      <>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 20,
+              background: trophy.color,
+              border: "2px solid var(--ink)",
+              boxShadow: "3px 3px 0 var(--ink)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon
+              name={trophy.icon}
+              size={34}
+              color="white"
+              strokeWidth={2.2}
+            />
+          </div>
+        </div>
+        <Eyebrow>
+          {count > 1
+            ? `Earned ×${count}`
+            : count > 0
+            ? "Earned"
+            : "How to earn it"}
+        </Eyebrow>
+        <div
+          style={{
+            fontFamily: "var(--body)",
+            fontSize: 15,
+            color: "var(--ink-soft)",
+            marginTop: 8,
+            lineHeight: 1.55,
+            fontWeight: 500,
+          }}
+        >
+          {trophy.how}
+        </div>
+      </>
+    )}
+  </Sheet>
+);
+
+// Full-screen browse of every trophy. Reached by tapping the "Trophy
+// Cabinet" header on the home page.
+export const TrophiesTab = ({
+  state,
+  dispatch,
+}: {
+  state: State;
+  dispatch: Dispatch;
+}) => {
+  const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
+  const earnedCount = TROPHIES.filter(
+    (t) => (state.badges[t.id] ?? 0) > 0
+  ).length;
+  return (
+    <div
+      style={{
+        padding: "8px 20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+      }}
+    >
+      <button
+        onClick={() => dispatch({ type: "TAB", tab: "today" })}
+        style={{
+          alignSelf: "flex-start",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          fontWeight: 700,
+          color: "var(--ink-soft)",
+        }}
+      >
+        <span style={{ fontSize: 14 }}>&larr;</span> Back home
+      </button>
+
+      <Card
+        padded={false}
+        style={{ padding: "20px 22px" }}
+        color="var(--purple-soft)"
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 6,
+          }}
+        >
+          <Eyebrow>All Trophies</Eyebrow>
+          <span
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 11,
+              color: "var(--purple)",
+              fontWeight: 700,
+            }}
+          >
+            {earnedCount}/{TROPHIES.length}
+          </span>
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--body)",
+            fontSize: 13,
+            color: "var(--ink-soft)",
+            lineHeight: 1.5,
+            fontWeight: 500,
+            marginBottom: 16,
+          }}
+        >
+          Tap any trophy to see how to earn it.
+        </div>
+        <TrophyGrid
+          badges={state.badges}
+          seen={state.seenTrophies}
+          onSelect={(t) => {
+            setOpenTrophy(t);
+            if (isNewTrophy(t, state.badges, state.seenTrophies))
+              dispatch({ type: "SEE_TROPHY", id: t.id });
+          }}
+        />
+      </Card>
+
+      <TrophyDetailSheet
+        trophy={openTrophy}
+        count={openTrophy ? state.badges[openTrophy.id] ?? 0 : 0}
+        onClose={() => setOpenTrophy(null)}
+      />
+    </div>
+  );
+};
+
 export const TodayTab = ({
   state,
   dispatch,
@@ -55,20 +390,31 @@ export const TodayTab = ({
     .reduce((a, b) => a + Number(b.stake), 0);
   const { lvl, next } = getLevel(state.streak);
 
-  const earnedCount = TROPHIES.filter((t) =>
-    state.badges.includes(t.id)
+  const earnedCount = TROPHIES.filter(
+    (t) => (state.badges[t.id] ?? 0) > 0
   ).length;
-  // Newest earned trophies first (badges are append-only, so reversing the
-  // earned slice puts the most recent unlock at the top of the cabinet),
-  // then unearned trophies fill out the grid in canonical order.
-  const cabinetTrophies = [
-    ...state.badges
-      .slice()
-      .reverse()
-      .map((id) => TROPHIES.find((t) => t.id === id))
-      .filter((t): t is Trophy => !!t),
-    ...TROPHIES.filter((t) => !state.badges.includes(t.id)),
-  ];
+  // Home cabinet (capped at 8): trophies completed THIS week first, then a
+  // random rotation of uncompleted ones (stable per day, reshuffles every
+  // 24h). The weekly set empties when the week rolls over, so the cabinet
+  // resets to uncompleted trophies each new week. Full set on the Trophies
+  // page.
+  const cabinetPreview = (() => {
+    const weeklyDone =
+      state.weeklyTrophyWeek === state.currentWeek
+        ? state.weeklyTrophies
+        : [];
+    const completedThisWeek = TROPHIES.filter(
+      (t) => weeklyDone.includes(t.id) && (state.badges[t.id] ?? 0) > 0
+    );
+    const uncompleted = TROPHIES.filter(
+      (t) => (state.badges[t.id] ?? 0) === 0
+    );
+    const dayIndex = Math.floor(Date.now() / 86400000);
+    return [
+      ...completedThisWeek,
+      ...seededShuffle(uncompleted, dayIndex),
+    ].slice(0, 8);
+  })();
   const [openTrophy, setOpenTrophy] = useState<Trophy | null>(null);
 
   return (
@@ -426,7 +772,26 @@ export const TodayTab = ({
             marginBottom: 14,
           }}
         >
-          <Eyebrow>Trophy Cabinet</Eyebrow>
+          <button
+            onClick={() => dispatch({ type: "TAB", tab: "trophies" })}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+            }}
+          >
+            <Eyebrow>Trophy Cabinet</Eyebrow>
+            <Icon
+              name="chevronRight"
+              size={14}
+              strokeWidth={2.6}
+              color="var(--purple)"
+            />
+          </button>
           <span
             style={{
               fontFamily: "var(--mono)",
@@ -438,135 +803,23 @@ export const TodayTab = ({
             {earnedCount}/{TROPHIES.length}
           </span>
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 10,
+        <TrophyGrid
+          badges={state.badges}
+          seen={state.seenTrophies}
+          onSelect={(t) => {
+            setOpenTrophy(t);
+            if (isNewTrophy(t, state.badges, state.seenTrophies))
+              dispatch({ type: "SEE_TROPHY", id: t.id });
           }}
-        >
-          {cabinetTrophies.map((t) => {
-            const earned = state.badges.includes(t.id);
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setOpenTrophy(t)}
-                aria-label={`${t.name}${earned ? " (earned)" : " — how to earn"}`}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 4,
-                  opacity: earned ? 1 : 0.32,
-                  filter: earned ? "none" : "grayscale(0.5)",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  font: "inherit",
-                }}
-              >
-                <div
-                  id={`trophy-slot-${t.id}`}
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 14,
-                    background: earned ? t.color : "white",
-                    border: "2px solid var(--ink)",
-                    boxShadow: earned ? "2px 2px 0 var(--ink)" : "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Icon
-                    name={t.icon}
-                    size={22}
-                    color="white"
-                    strokeWidth={2.2}
-                  />
-                </div>
-                <span
-                  style={{
-                    fontFamily: "var(--mono)",
-                    fontSize: 9.5,
-                    color: "var(--ink)",
-                    fontWeight: 600,
-                    letterSpacing: "0.02em",
-                    textAlign: "center",
-                  }}
-                >
-                  {t.name}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+          trophies={cabinetPreview}
+        />
       </Card>
 
-      <Sheet
-        open={!!openTrophy}
+      <TrophyDetailSheet
+        trophy={openTrophy}
+        count={openTrophy ? state.badges[openTrophy.id] ?? 0 : 0}
         onClose={() => setOpenTrophy(null)}
-        title={
-          openTrophy
-            ? `${openTrophy.name} ${
-                state.badges.includes(openTrophy.id) ? "🏆" : "🔒"
-              }`
-            : ""
-        }
-      >
-        {openTrophy && (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginBottom: 20,
-              }}
-            >
-              <div
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 20,
-                  background: openTrophy.color,
-                  border: "2px solid var(--ink)",
-                  boxShadow: "3px 3px 0 var(--ink)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon
-                  name={openTrophy.icon}
-                  size={34}
-                  color="white"
-                  strokeWidth={2.2}
-                />
-              </div>
-            </div>
-            <Eyebrow>
-              {state.badges.includes(openTrophy.id)
-                ? "Earned"
-                : "How to earn it"}
-            </Eyebrow>
-            <div
-              style={{
-                fontFamily: "var(--body)",
-                fontSize: 15,
-                color: "var(--ink-soft)",
-                marginTop: 8,
-                lineHeight: 1.55,
-                fontWeight: 500,
-              }}
-            >
-              {openTrophy.how}
-            </div>
-          </>
-        )}
-      </Sheet>
+      />
     </div>
   );
 };
@@ -1232,6 +1485,83 @@ export const FutureQuestsTab = ({
             </Button>
           </div>
         ))}
+      </Card>
+
+      <Card padded={false} style={{ padding: "8px 22px" }}>
+        <div
+          style={{
+            fontFamily: "var(--mono)",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            fontWeight: 700,
+            color: "var(--ink-soft)",
+            padding: "14px 0 2px",
+          }}
+        >
+          Trophies
+        </div>
+        {TROPHIES.map((t, i) => {
+          const count = state.badges[t.id] ?? 0;
+          return (
+            <div
+              key={t.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "14px 0",
+                borderTop: i > 0 ? "2px solid rgba(27,17,64,0.08)" : "none",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: "var(--body)",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {t.name}
+                </div>
+                <div
+                  style={{
+                    fontFamily: "var(--mono)",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "var(--ink-soft)",
+                    marginTop: 2,
+                  }}
+                >
+                  {count > 0
+                    ? `Earned${count > 1 ? ` ×${count}` : ""}`
+                    : "Locked"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={count === 0}
+                  onClick={() =>
+                    dispatch({ type: "REMOVE_BADGE", id: t.id })
+                  }
+                >
+                  -1
+                </Button>
+                <Button
+                  variant="purple"
+                  size="sm"
+                  onClick={() => dispatch({ type: "ADD_BADGE", id: t.id })}
+                >
+                  +1
+                </Button>
+              </div>
+            </div>
+          );
+        })}
       </Card>
 
       <Card padded={false} style={{ padding: "8px 22px" }}>
@@ -2406,6 +2736,11 @@ export const TasksTab = ({
     }))
     .filter((group) => group.tasks.length > 0);
 
+  // Tasks not tied to any quest. They have no category, so they only show
+  // under "All".
+  const standaloneTasks =
+    filter === "All" ? state.tasks.filter((t) => !t.goalId) : [];
+
   return (
     <div
       style={{
@@ -2511,7 +2846,7 @@ export const TasksTab = ({
       </Button>
 
       {/* Grouped tasks */}
-      {groupedGoals.length === 0 && (
+      {groupedGoals.length === 0 && standaloneTasks.length === 0 && (
         <Card
           padded={false}
           style={{ padding: "32px 20px", textAlign: "center" }}
@@ -2654,6 +2989,66 @@ export const TasksTab = ({
           </Card>
         );
       })}
+
+      {standaloneTasks.length > 0 && (
+        <Card padded={false} style={{ padding: 0, overflow: "hidden" }}>
+          <div
+            style={{
+              background: "var(--ink)",
+              padding: "12px 18px",
+              color: "white",
+              borderBottom: "2px solid var(--ink)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 9.5,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                fontWeight: 700,
+                opacity: 0.85,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Icon name="list" size={11} strokeWidth={2.4} />
+              Standalone · no quest
+            </div>
+            <div
+              style={{
+                background: "white",
+                color: "var(--ink)",
+                border: "2px solid var(--ink)",
+                borderRadius: 999,
+                padding: "3px 10px",
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                fontWeight: 800,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {standaloneTasks.filter((t) => t.done).length}/
+              {standaloneTasks.length}
+            </div>
+          </div>
+          <div style={{ padding: "4px 18px" }}>
+            {standaloneTasks.map((t, i) => (
+              <TaskRow
+                key={t.id}
+                task={t}
+                dispatch={dispatch}
+                first={i === 0}
+              />
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 };

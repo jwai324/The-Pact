@@ -1,5 +1,9 @@
 import { supabase } from "./supabase";
-import { computeRelative, currentWeek } from "./helpers";
+import {
+  computeRelative,
+  currentWeek,
+  mergeWeeklyTrophies,
+} from "./helpers";
 import type { Rollover } from "./helpers";
 import type {
   Action,
@@ -115,6 +119,40 @@ export async function fetchAll(): Promise<DataSlice> {
     proofUrl: p.proof_url ?? null,
   }));
 
+  // `badges` jsonb holds { counts, active, seen }. Legacy rows store a bare
+  // array of earned ids (incl. the display-name seed, which never matched a
+  // trophy id and stays inert): map each to one earning and treat them as
+  // still active so the first post-deploy evaluation doesn't re-count held
+  // trophies.
+  const rawBadges = a?.badges as unknown;
+  let badges: Record<string, number> = {};
+  let activeTrophies: string[] = [];
+  let seenTrophies: string[] | null = null;
+  let weeklyTrophies: string[] = [];
+  let weeklyTrophyWeek: string | null = null;
+  if (Array.isArray(rawBadges)) {
+    for (const id of rawBadges as string[]) badges[id] = 1;
+    activeTrophies = [...(rawBadges as string[])];
+  } else if (rawBadges && typeof rawBadges === "object") {
+    const o = rawBadges as {
+      counts?: Record<string, number>;
+      active?: string[];
+      seen?: string[];
+      weekly?: { key?: string | null; ids?: string[] };
+    };
+    badges = o.counts ?? {};
+    activeTrophies = o.active ?? [];
+    seenTrophies = o.seen ?? null;
+    weeklyTrophies = o.weekly?.ids ?? [];
+    weeklyTrophyWeek = o.weekly?.key ?? null;
+  }
+  // First run with no stored `seen`: treat every already-earned trophy as
+  // seen so the historical backlog doesn't all light up as "new". Only
+  // trophies earned from here on get the stamp.
+  if (seenTrophies === null) {
+    seenTrophies = Object.keys(badges).filter((id) => badges[id] > 0);
+  }
+
   return {
     streak: a?.streak ?? 0,
     saved: a ? Number(a.saved) : 0,
@@ -127,7 +165,11 @@ export async function fetchAll(): Promise<DataSlice> {
         a?.discretionary_budget != null ? Number(a.discretionary_budget) : 50,
     },
     lastLockedStakes: a ? Number(a.last_locked_stakes) : 0,
-    badges: (a?.badges as string[]) ?? [],
+    badges,
+    activeTrophies,
+    seenTrophies,
+    weeklyTrophies,
+    weeklyTrophyWeek,
     goals,
     futureGoals,
     tasks,
@@ -191,6 +233,11 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .from("goals")
           .update({ status: "Pass", relative: "passed today" })
           .eq("id", action.id);
+        await supabase
+          .from("tasks")
+          .update({ done: true })
+          .eq("goal_id", action.id)
+          .eq("done", false);
         await supabase
           .from("app_state")
           .update({ saved: prev.saved + Number(g?.stake ?? 0) })
@@ -347,7 +394,7 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
       case "ADD_TASK": {
         const nextSort = Math.max(0, ...prev.tasks.map((t) => t.sort)) + 1;
         await supabase.from("tasks").insert({
-          goal_id: action.goalId,
+          goal_id: action.goalId || null,
           title: action.title,
           minutes: action.minutes,
           done: false,
@@ -410,12 +457,89 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
         return true;
       }
       case "AWARD_BADGES": {
-        const merged = Array.from(
-          new Set([...prev.badges, ...action.ids])
+        const counts: Record<string, number> = { ...prev.badges };
+        for (const id of action.ids)
+          counts[id] = (counts[id] ?? 0) + 1;
+        const weekly = mergeWeeklyTrophies(
+          prev.weeklyTrophies,
+          prev.weeklyTrophyWeek,
+          action.ids
         );
         await supabase
           .from("app_state")
-          .update({ badges: merged })
+          .update({
+            badges: {
+              counts,
+              active: action.active,
+              seen: prev.seenTrophies,
+              weekly,
+            },
+          })
+          .eq("id", 1);
+        return true;
+      }
+      case "ADD_BADGE": {
+        const counts: Record<string, number> = { ...prev.badges };
+        counts[action.id] = (counts[action.id] ?? 0) + 1;
+        const weekly = mergeWeeklyTrophies(
+          prev.weeklyTrophies,
+          prev.weeklyTrophyWeek,
+          [action.id]
+        );
+        await supabase
+          .from("app_state")
+          .update({
+            badges: {
+              counts,
+              active: prev.activeTrophies,
+              seen: prev.seenTrophies,
+              weekly,
+            },
+          })
+          .eq("id", 1);
+        return true;
+      }
+      case "REMOVE_BADGE": {
+        const counts: Record<string, number> = { ...prev.badges };
+        const next = (counts[action.id] ?? 0) - 1;
+        if (next > 0) counts[action.id] = next;
+        else delete counts[action.id];
+        const seen =
+          next > 0
+            ? prev.seenTrophies
+            : prev.seenTrophies.filter((x) => x !== action.id);
+        const weeklyIds =
+          next > 0
+            ? prev.weeklyTrophies
+            : prev.weeklyTrophies.filter((x) => x !== action.id);
+        await supabase
+          .from("app_state")
+          .update({
+            badges: {
+              counts,
+              active: prev.activeTrophies,
+              seen,
+              weekly: { key: prev.weeklyTrophyWeek, ids: weeklyIds },
+            },
+          })
+          .eq("id", 1);
+        return true;
+      }
+      case "SEE_TROPHY": {
+        if (prev.seenTrophies.includes(action.id)) return false;
+        await supabase
+          .from("app_state")
+          .update({
+            badges: {
+              counts: prev.badges,
+              active: prev.activeTrophies,
+              seen: [...prev.seenTrophies, action.id],
+              weekly: {
+                key: prev.weeklyTrophyWeek,
+                ids: prev.weeklyTrophies,
+              },
+            },
+          })
           .eq("id", 1);
         return true;
       }

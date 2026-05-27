@@ -37,7 +37,7 @@ export interface Goal {
 
 export interface Task {
   id: string;
-  goalId: string;
+  goalId: string | null;
   title: string;
   minutes: number | null;
   done: boolean;
@@ -78,7 +78,21 @@ export interface DataSlice {
   urgesSkipped: number;
   budgets: SpendBudgets;
   lastLockedStakes: number;
-  badges: string[];
+  // Trophy id -> number of times earned (cumulative; re-earnable). Display
+  // only; never reflects current criteria once a count is recorded.
+  badges: Record<string, number>;
+  // Trophy ids whose criteria are currently met, as of the last evaluation.
+  // Persisted so a not-met -> met transition (a fresh earn) can be detected
+  // across reloads without re-counting every refresh.
+  activeTrophies: string[];
+  // Earned trophy ids the user has already opened. An earned trophy NOT in
+  // this list is "new" and gets a stamp until viewed.
+  seenTrophies: string[];
+  // Trophy ids earned during `weeklyTrophyWeek` (a week key). The home
+  // cabinet shows these, then empties back to uncompleted trophies once the
+  // week rolls over (week key no longer matches the current week).
+  weeklyTrophies: string[];
+  weeklyTrophyWeek: string | null;
   goals: Goal[];
   futureGoals: Goal[];
   tasks: Task[];
@@ -126,7 +140,12 @@ export type Action =
   | { type: "PUSH_FUTURE_GOAL"; id: string; category: Category }
   | { type: "DELETE_FUTURE_GOAL"; id: string }
   | { type: "LOG_SPEND"; amount: number; note: string; category: string }
-  | { type: "ADD_TASK"; goalId: string; title: string; minutes: number | null }
+  | {
+      type: "ADD_TASK";
+      goalId: string | null;
+      title: string;
+      minutes: number | null;
+    }
   | { type: "TOGGLE_TASK"; id: string }
   | { type: "EDIT_TASK"; id: string; title: string }
   | { type: "EDIT_GOAL"; id: string; title: string }
@@ -135,7 +154,10 @@ export type Action =
   | { type: "DELETE_WANT"; id: string }
   | { type: "DELETE_SPEND"; id: string }
   | { type: "RESET_URGES" }
-  | { type: "AWARD_BADGES"; ids: string[] }
+  | { type: "AWARD_BADGES"; ids: string[]; active: string[] }
+  | { type: "ADD_BADGE"; id: string }
+  | { type: "REMOVE_BADGE"; id: string }
+  | { type: "SEE_TROPHY"; id: string }
   | { type: "SET_BUDGET"; category: SpendCategory; amount: number }
   | { type: "SET_STREAK"; value: number }
   | { type: "SET_SAVED"; value: number }
