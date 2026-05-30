@@ -262,6 +262,32 @@ export function reducer(state: State, action: Action): State {
         goals: [...state.goals, promoted],
       };
     }
+    case "RECATEGORIZE_GOAL": {
+      // Move an active quest to a different category. Its tasks stay attached
+      // via goalId, so they come along automatically. The deadline and stake
+      // are reset to the new category's defaults (Side has no stake).
+      const stake =
+        action.category === "Weekly"
+          ? 50
+          : action.category === "Monthly"
+          ? 100
+          : action.category === "Side"
+          ? 0
+          : 150;
+      return {
+        ...state,
+        goals: state.goals.map((g) =>
+          g.id === action.id
+            ? {
+                ...g,
+                category: action.category,
+                relative: computeRelative(action.category),
+                stake,
+              }
+            : g
+        ),
+      };
+    }
     case "DELETE_FUTURE_GOAL":
       return {
         ...state,

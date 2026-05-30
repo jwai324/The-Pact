@@ -367,6 +367,26 @@ export async function persist(action: Action, prev: State): Promise<boolean> {
           .eq("id", action.id);
         return true;
       }
+      case "RECATEGORIZE_GOAL": {
+        // Tasks reference this goal via goal_id, so they follow automatically.
+        const stake =
+          action.category === "Weekly"
+            ? 50
+            : action.category === "Monthly"
+            ? 100
+            : action.category === "Side"
+            ? 0
+            : 150;
+        await supabase
+          .from("goals")
+          .update({
+            category: action.category,
+            relative: null,
+            stake,
+          })
+          .eq("id", action.id);
+        return true;
+      }
       case "DELETE_FUTURE_GOAL":
         await supabase.from("goals").delete().eq("id", action.id);
         return true;

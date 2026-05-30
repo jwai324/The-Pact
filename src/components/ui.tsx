@@ -66,6 +66,12 @@ export const Icon = ({
         <path d="M18 6L6 18M6 6l12 12" />
       </>
     ),
+    refresh: (
+      <>
+        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+        <path d="M21 3v5h-5" />
+      </>
+    ),
     chevronRight: (
       <>
         <path d="M9 6l6 6-6 6" />
