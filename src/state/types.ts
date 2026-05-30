@@ -138,6 +138,7 @@ export type Action =
   | { type: "ADD_GOAL"; title: string; category: Category; stake: number }
   | { type: "ADD_FUTURE_GOAL"; title: string; stake: number }
   | { type: "PUSH_FUTURE_GOAL"; id: string; category: Category }
+  | { type: "RECATEGORIZE_GOAL"; id: string; category: Category }
   | { type: "DELETE_FUTURE_GOAL"; id: string }
   | { type: "LOG_SPEND"; amount: number; note: string; category: string }
   | {

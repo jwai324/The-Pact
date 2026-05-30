@@ -19,6 +19,7 @@ import {
 } from "./components/ui";
 import type {
   Action,
+  Category,
   Goal,
   SpendCategory,
   State,
@@ -832,6 +833,7 @@ export const GoalRow = ({
   hideStake = false,
   onAddTask,
   onDelete,
+  onRecategorize,
 }: {
   goal: Goal;
   dispatch: Dispatch;
@@ -840,11 +842,20 @@ export const GoalRow = ({
   hideStake?: boolean;
   onAddTask?: () => void;
   onDelete?: () => void;
+  onRecategorize?: (category: Category) => void;
 }) => {
   const tone =
     goal.status === "Pass" ? "pass" : goal.status === "Fail" ? "fail" : "pending";
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter((t) => t.done).length;
+  const [recatOpen, setRecatOpen] = useState(false);
+  const categories: Category[] = ["Weekly", "Monthly", "Quarterly", "Side"];
+  const catColors: Record<Category, string> = {
+    Weekly: "var(--accent)",
+    Monthly: "var(--purple)",
+    Quarterly: "var(--magenta)",
+    Side: "var(--teal)",
+  };
   return (
     <div>
       <div
@@ -994,30 +1005,119 @@ export const GoalRow = ({
           ↺ undo
         </button>
       )}
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          aria-label={`Delete quest: ${goal.title}`}
+      {(onDelete || onRecategorize) && (
+        <div
           style={{
             marginTop: 12,
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            gap: 5,
-            background: "transparent",
-            border: "none",
-            padding: 0,
-            cursor: "pointer",
-            fontFamily: "var(--mono)",
-            fontSize: 11,
-            color: "var(--red)",
-            textDecoration: "underline",
-            letterSpacing: "0.04em",
-            fontWeight: 600,
+            gap: 16,
+            flexWrap: "wrap",
           }}
         >
-          <Icon name="x" size={12} strokeWidth={2.6} color="var(--red)" />{" "}
-          Delete quest
-        </button>
+          {onRecategorize && (
+            <button
+              onClick={() => setRecatOpen((v) => !v)}
+              aria-label={`Recategorize quest: ${goal.title}`}
+              aria-expanded={recatOpen}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                color: "var(--sky)",
+                textDecoration: "underline",
+                letterSpacing: "0.04em",
+                fontWeight: 600,
+              }}
+            >
+              <Icon name="refresh" size={12} strokeWidth={2.6} color="var(--sky)" />{" "}
+              Recategorize quest
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              aria-label={`Delete quest: ${goal.title}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                color: "var(--red)",
+                textDecoration: "underline",
+                letterSpacing: "0.04em",
+                fontWeight: 600,
+              }}
+            >
+              <Icon name="x" size={12} strokeWidth={2.6} color="var(--red)" />{" "}
+              Delete quest
+            </button>
+          )}
+        </div>
+      )}
+      {onRecategorize && recatOpen && (
+        <div style={{ marginTop: 10 }}>
+          <div
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: 11,
+              color: "var(--ink-soft)",
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              marginBottom: 6,
+            }}
+          >
+            Move to · tasks come along
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 6,
+            }}
+          >
+            {categories.map((cat) => {
+              const current = cat === goal.category;
+              return (
+                <button
+                  key={cat}
+                  disabled={current}
+                  onClick={() => {
+                    onRecategorize(cat);
+                    setRecatOpen(false);
+                  }}
+                  style={{
+                    height: 38,
+                    borderRadius: 9,
+                    cursor: current ? "default" : "pointer",
+                    background: current ? "var(--paper)" : catColors[cat],
+                    color: current ? "var(--ink-soft)" : "white",
+                    border: "2px solid var(--ink)",
+                    boxShadow: current ? "none" : "2px 2px 0 var(--ink)",
+                    fontFamily: "var(--body)",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    letterSpacing: "0.02em",
+                    opacity: current ? 0.55 : 1,
+                  }}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1171,6 +1271,9 @@ export const GoalsTab = ({
               tasks={state.tasks.filter((t) => t.goalId === g.id)}
               hideStake={g.category === "Side"}
               onAddTask={() => openSheet("addTask", { goalId: g.id })}
+              onRecategorize={(category) =>
+                dispatch({ type: "RECATEGORIZE_GOAL", id: g.id, category })
+              }
               onDelete={() => {
                 if (
                   window.confirm(
@@ -1247,6 +1350,9 @@ export const GoalsTab = ({
                   dispatch={dispatch}
                   tasks={state.tasks.filter((t) => t.goalId === g.id)}
                   hideStake={g.category === "Side"}
+                  onRecategorize={(category) =>
+                    dispatch({ type: "RECATEGORIZE_GOAL", id: g.id, category })
+                  }
                   onDelete={() => {
                     if (
                       window.confirm(
